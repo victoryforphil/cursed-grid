@@ -238,39 +238,69 @@ export function CursedGrid<TData = unknown>({
     },
   }), [internalColumnDefs, mergedColumnDefs]);
 
-  // Fire onGridReady
+  // Refs for stable references
+  const gridApiRef = React.useRef<GridApi<TData>>(gridApi);
+  const columnApiRef = React.useRef<ColumnApi<TData>>(columnApi);
+  const rowNodesRef = React.useRef(rowNodes);
+  
+  // Sync refs in effects
   React.useEffect(() => {
-    if (onGridReady) {
+    gridApiRef.current = gridApi;
+  }, [gridApi]);
+  
+  React.useEffect(() => {
+    columnApiRef.current = columnApi;
+  }, [columnApi]);
+  
+  React.useEffect(() => {
+    rowNodesRef.current = rowNodes;
+  }, [rowNodes]);
+
+  // Fire onGridReady - only on mount
+  const hasCalledGridReady = React.useRef(false);
+  React.useEffect(() => {
+    if (onGridReady && !hasCalledGridReady.current) {
+      hasCalledGridReady.current = true;
       const event: GridReadyEvent<TData> = {
-        api: gridApi,
-        columnApi,
+        api: gridApiRef.current,
+        columnApi: columnApiRef.current,
       };
       onGridReady(event);
     }
-  }, [onGridReady, gridApi, columnApi]);
+  }, [onGridReady]);
 
-  // Handle selection change
+  // Handle selection change - only when selectedRowIds changes, not on other dependencies
+  const prevSelectedIdsRef = React.useRef<Set<string>>(new Set());
   React.useEffect(() => {
-    if (onSelectionChanged) {
-      const selectedRows = rowNodes
+    // Only call if selectedRowIds actually changed (compare size and contents)
+    const prevIds = prevSelectedIdsRef.current;
+    const currentIds = selectedRowIds;
+    
+    const idsChanged = prevIds.size !== currentIds.size || 
+      [...currentIds].some(id => !prevIds.has(id));
+    
+    if (idsChanged && onSelectionChanged) {
+      const selectedRows = rowNodesRef.current
         .filter((node) => selectedRowIds.has(node.id))
         .map((node) => node.data);
       
       const event: SelectionChangedEvent<TData> = {
-        api: gridApi,
-        columnApi,
+        api: gridApiRef.current,
+        columnApi: columnApiRef.current,
         selectedRows,
       };
       onSelectionChanged(event);
     }
-  }, [selectedRowIds, onSelectionChanged, rowNodes, gridApi, columnApi]);
+    
+    prevSelectedIdsRef.current = new Set(selectedRowIds);
+  }, [selectedRowIds, onSelectionChanged]);
 
   // Handle row click
   const handleRowClick = (node: RowNode<TData>) => {
     if (onRowClicked) {
       const event: RowClickedEvent<TData> = {
-        api: gridApi,
-        columnApi,
+        api: gridApiRef.current,
+        columnApi: columnApiRef.current,
         data: node.data,
         rowIndex: node.rowIndex,
         node,
@@ -303,8 +333,8 @@ export function CursedGrid<TData = unknown>({
   ) => {
     if (onCellClicked) {
       const event: CellClickedEvent<TData> = {
-        api: gridApi,
-        columnApi,
+        api: gridApiRef.current,
+        columnApi: columnApiRef.current,
         data: node.data,
         value,
         colDef,
