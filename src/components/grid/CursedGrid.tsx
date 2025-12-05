@@ -520,10 +520,9 @@ export function CursedGrid<TData = unknown>({
                           colDef.pinned === "left" && "sticky left-0 z-10 bg-background",
                           colDef.pinned === "right" && "sticky right-0 z-10 bg-background"
                         )}
-                        onClick={(e) => {
-                          e.stopPropagation();
+                        onClick={() => {
                           handleCellClick(node, colDef, value);
-                          handleRowClick(node);
+                          // Note: Row click is handled by the TableRow onClick
                         }}
                       >
                         {renderCell(node, colDef)}

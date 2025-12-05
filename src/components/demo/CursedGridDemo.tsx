@@ -106,18 +106,33 @@ export function CursedGridDemo() {
     <div className="space-y-4">
       {/* Toolbar */}
       <div className="p-4 border-b bg-muted/30 flex flex-wrap gap-2 items-center justify-between">
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={handleSelectAll}>
+        <div className="flex gap-2" role="toolbar" aria-label="Grid actions">
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={handleSelectAll}
+            aria-label="Select all rows in the employee grid"
+          >
             Select All
           </Button>
-          <Button variant="outline" size="sm" onClick={handleDeselectAll}>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={handleDeselectAll}
+            aria-label="Deselect all rows in the employee grid"
+          >
             Deselect All
           </Button>
-          <Button variant="outline" size="sm" onClick={handleExportCsv}>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={handleExportCsv}
+            aria-label="Export employee data as CSV file"
+          >
             Export CSV
           </Button>
         </div>
-        <div className="text-sm text-muted-foreground">
+        <div className="text-sm text-muted-foreground" aria-live="polite">
           {selectedRows.length > 0 && (
             <span>{selectedRows.length} row(s) selected</span>
           )}
