@@ -183,6 +183,70 @@ export interface IGetRowsParams<TData = unknown> {
 export type RowModelType = "clientSide" | "serverSide" | "infinite";
 
 // ============================================================================
+// SIDEBAR TYPES
+// ============================================================================
+
+/**
+ * Tool panel definition
+ */
+export interface ToolPanelDef {
+  id: string;
+  labelDefault?: string;
+  labelKey?: string;
+  iconKey?: string;
+  toolPanel?: string | React.ComponentType;
+  toolPanelParams?: {
+    suppressRowGroups?: boolean;
+    suppressValues?: boolean;
+    suppressPivots?: boolean;
+    suppressPivotMode?: boolean;
+    suppressColumnFilter?: boolean;
+    suppressColumnSelectAll?: boolean;
+    suppressColumnExpandAll?: boolean;
+    suppressExpandAll?: boolean;
+    suppressFilterSearch?: boolean;
+  };
+}
+
+/**
+ * Sidebar configuration
+ */
+export interface SideBarDef {
+  toolPanels?: (string | ToolPanelDef)[];
+  defaultToolPanel?: string;
+  hiddenByDefault?: boolean;
+  position?: "left" | "right";
+}
+
+// ============================================================================
+// CONTEXT MENU TYPES
+// ============================================================================
+
+/**
+ * Context menu item
+ */
+export interface ContextMenuItem {
+  name: string;
+  action?: () => void;
+  shortcut?: string;
+  icon?: React.ReactNode;
+  disabled?: boolean;
+  subMenu?: (string | ContextMenuItem)[];
+  cssClasses?: string[];
+}
+
+/**
+ * Params for getContextMenuItems
+ */
+export interface GetContextMenuItemsParams<TData = unknown> {
+  node: RowNode<TData> | null;
+  column: ColDef<TData> | null;
+  value: unknown;
+  api: GridApi<TData>;
+  columnApi: ColumnApi<TData>;
+}
+
+// ============================================================================
 // COLUMN DEFINITION
 // ============================================================================
 
@@ -190,6 +254,34 @@ export type RowModelType = "clientSide" | "serverSide" | "infinite";
  * Filter type - specifies which filter component to use
  */
 export type FilterType = "agTextColumnFilter" | "agNumberColumnFilter" | "agDateColumnFilter" | "agSetColumnFilter" | true | false;
+
+/**
+ * Filter params - configuration for column filters
+ */
+export interface FilterParams {
+  /** Filter buttons to show */
+  buttons?: ("apply" | "clear" | "reset" | "cancel")[];
+  /** Close filter popup on apply */
+  closeOnApply?: boolean;
+  /** Maximum number of filter conditions */
+  maxNumConditions?: number;
+  /** Available filter options */
+  filterOptions?: string[];
+  /** Predefined values for set filter */
+  values?: (string | null)[];
+  /** Default to nothing selected (set filter) */
+  defaultToNothingSelected?: boolean;
+  /** Placeholder text */
+  placeholder?: string;
+  /** Debounce time in ms */
+  debounceMs?: number;
+  /** Case sensitive filtering */
+  caseSensitive?: boolean;
+  /** Custom key creator for set filter */
+  keyCreator?: (params: { value: unknown }) => string;
+  /** Custom value formatter for set filter display */
+  valueFormatter?: (params: { value: unknown }) => string;
+}
 
 /**
  * Column definition - describes a column in the grid
@@ -217,18 +309,11 @@ export interface ColDef<TData = unknown> {
   /** Whether to show floating filter for this column */
   floatingFilter?: boolean;
   /** Filter params for customizing filter behavior */
-  filterParams?: {
-    /** For text filter: filter options to show */
-    filterOptions?: string[];
-    /** For number filter: allow decimals */
-    allowedCharPattern?: string;
-    /** For set filter: values to show */
-    values?: string[];
-    /** Debounce time in ms before applying filter */
-    debounceMs?: number;
-    /** Case sensitive filtering */
-    caseSensitive?: boolean;
-  };
+  filterParams?: FilterParams;
+  /** Custom filter value getter */
+  filterValueGetter?: (params: ValueGetterParams<TData>) => unknown;
+  /** Custom quick filter text getter */
+  getQuickFilterText?: (params: { value: unknown; data: TData }) => string;
   /** Whether the column is resizable */
   resizable?: boolean;
   /** Whether the column is hidden */
@@ -257,6 +342,56 @@ export interface ColDef<TData = unknown> {
   children?: ColDef<TData>[];
   /** Header group name */
   headerGroupComponent?: React.ComponentType;
+  
+  // Selection
+  /** Show checkbox for selection in this column */
+  checkboxSelection?: boolean | ((params: { data: TData; node: RowNode<TData> }) => boolean);
+  /** Show checkbox in header for select all */
+  headerCheckboxSelection?: boolean;
+  /** Only select filtered rows when using header checkbox */
+  headerCheckboxSelectionFilteredOnly?: boolean;
+  
+  // Tooltips
+  /** Field to use for tooltip */
+  tooltipField?: string;
+  /** Custom tooltip value getter */
+  tooltipValueGetter?: (params: { value: unknown; data: TData; node: RowNode<TData> }) => string;
+  /** Custom tooltip component */
+  tooltipComponent?: React.ComponentType<{ value: string }>;
+  
+  // Cell Styling
+  /** Inline styles for cells */
+  cellStyle?: React.CSSProperties | ((params: CellClassParams<TData>) => React.CSSProperties);
+  /** Auto-adjust row height based on cell content */
+  autoHeight?: boolean;
+  
+  // Row Grouping
+  /** Enable row grouping on this column */
+  rowGroup?: boolean;
+  /** Row group index (priority) */
+  rowGroupIndex?: number;
+  /** Aggregation function for grouped data */
+  aggFunc?: "sum" | "min" | "max" | "count" | "avg" | "first" | "last" | ((params: { values: unknown[] }) => unknown);
+  /** Custom key creator for grouping */
+  keyCreator?: (params: { value: unknown }) => string;
+  
+  // Behavior
+  /** Prevent column from being moved */
+  suppressMovable?: boolean;
+  /** Suppress cell focus for this column */
+  suppressCellFocus?: boolean;
+  /** Suppress size to fit for this column */
+  suppressSizeToFit?: boolean;
+  /** Suppress keyboard events */
+  suppressKeyboardEvent?: (params: { event: KeyboardEvent }) => boolean;
+  /** Enable cell change flash */
+  enableCellChangeFlash?: boolean;
+  
+  // Default sort
+  /** Default sort direction */
+  sort?: "asc" | "desc" | null;
+  /** Sort index for multi-column sorting */
+  sortIndex?: number;
 }
 
 /**
@@ -404,6 +539,36 @@ export interface GridApi<TData = unknown> {
   // Generic grid option setter (AG Grid 32+ style)
   /** Set a single grid option dynamically */
   setGridOption: <K extends keyof GridOptions<TData>>(key: K, value: GridOptions<TData>[K]) => void;
+  
+  // Display operations
+  /** Ensure row index is visible */
+  ensureIndexVisible: (index: number, position?: "top" | "bottom" | "middle") => void;
+  /** Ensure column is visible */
+  ensureColumnVisible: (colId: string, position?: "start" | "middle" | "end") => void;
+  /** Get all displayed columns */
+  getAllDisplayedColumns: () => ColDef<TData>[];
+  
+  // Row grouping
+  /** Expand all row groups */
+  expandAll: () => void;
+  /** Collapse all row groups */
+  collapseAll: () => void;
+  /** Set row node expanded state */
+  setRowNodeExpanded: (node: RowNode<TData>, expanded: boolean, recursive?: boolean) => void;
+  /** Iterate over all nodes */
+  forEachNode: (callback: (node: RowNode<TData>, index: number) => void) => void;
+  
+  // Selection
+  /** Get selected nodes */
+  getSelectedNodes: () => RowNode<TData>[];
+  
+  // State persistence
+  /** Get current grid state */
+  getState: () => GridState;
+  /** Get column group state */
+  getColumnGroupState: () => { groupId: string; open: boolean }[];
+  /** Set column group state */
+  setColumnGroupState: (state: { groupId: string; open: boolean }[]) => void;
 }
 
 /**
@@ -512,6 +677,37 @@ export interface ModelUpdatedEvent<TData = unknown> {
 }
 
 /**
+ * Column event (for visibility, pinning, resizing, moving)
+ */
+export interface ColumnEvent<TData = unknown> {
+  api: GridApi<TData>;
+  columnApi: ColumnApi<TData>;
+  column: ColDef<TData> | null;
+  columns: ColDef<TData>[];
+  source: string;
+}
+
+/**
+ * Row group opened event
+ */
+export interface RowGroupOpenedEvent<TData = unknown> {
+  api: GridApi<TData>;
+  columnApi: ColumnApi<TData>;
+  node: RowNode<TData>;
+  expanded: boolean;
+}
+
+/**
+ * Grid state for persistence
+ */
+export interface GridState {
+  filter?: FilterModel;
+  sort?: SortModelItem[];
+  columnState?: ColumnState[];
+  columnGroupState?: { groupId: string; open: boolean }[];
+}
+
+/**
  * Main Grid Options - configuration for the CursedGrid
  * Compatible with AG Grid's GridOptions interface (Enterprise 32.3.1)
  */
@@ -611,6 +807,14 @@ export interface GridOptions<TData = unknown> {
   rowSelection?: "single" | "multiple" | null;
   /** Suppress row click selection */
   suppressRowClickSelection?: boolean;
+  /** Enable cell selection */
+  cellSelection?: boolean;
+  /** Enable text selection in cells */
+  enableCellTextSelection?: boolean;
+  /** Enable range selection */
+  enableRangeSelection?: boolean;
+  /** Group selects children */
+  groupSelectsChildren?: boolean;
   
   // ============================================================================
   // PAGINATION
@@ -639,6 +843,42 @@ export interface GridOptions<TData = unknown> {
   showColumnsPanel?: boolean;
   /** Show built-in toolbar. Default: false (toolbar is externally controlled) */
   showToolbar?: boolean;
+  /** Sidebar configuration */
+  sideBar?: boolean | SideBarDef | string;
+  
+  // ============================================================================
+  // ROW GROUPING
+  // ============================================================================
+  /** How to display grouped rows */
+  groupDisplayType?: "singleColumn" | "multipleColumns" | "groupRows" | "custom";
+  /** Default expanded level (0 = all collapsed, -1 = all expanded) */
+  groupDefaultExpanded?: number;
+  /** Callback to determine if group should be open by default */
+  isGroupOpenByDefault?: (params: { rowNode: RowNode<TData>; level: number }) => boolean;
+  /** Auto group column definition */
+  autoGroupColumnDef?: ColDef<TData>;
+  /** Suppress aggregation function in header */
+  suppressAggFuncInHeader?: boolean;
+  /** Group row renderer params */
+  groupRowRendererParams?: Record<string, unknown>;
+  
+  // ============================================================================
+  // CONTEXT MENU
+  // ============================================================================
+  /** Custom context menu items */
+  getContextMenuItems?: (params: GetContextMenuItemsParams<TData>) => (string | ContextMenuItem)[];
+  /** Allow context menu with control key */
+  allowContextMenuWithControlKey?: boolean;
+  
+  // ============================================================================
+  // CLIPBOARD
+  // ============================================================================
+  /** Copy headers to clipboard */
+  copyHeadersToClipboard?: boolean;
+  /** Process header for clipboard */
+  processHeaderForClipboard?: (params: { column: ColDef<TData> }) => string;
+  /** Process cell for clipboard */
+  processCellForClipboard?: (params: { value: unknown; node: RowNode<TData>; column: ColDef<TData> }) => string;
   
   // ============================================================================
   // IDENTIFICATION
@@ -671,6 +911,24 @@ export interface GridOptions<TData = unknown> {
   onFilterChanged?: (event: FilterChangedEvent<TData>) => void;
   /** Callback when model is updated */
   onModelUpdated?: (event: ModelUpdatedEvent<TData>) => void;
+  /** Callback when first data is rendered */
+  onFirstDataRendered?: (event: GridReadyEvent<TData>) => void;
+  /** Callback when state is updated */
+  onStateUpdated?: (event: { state: GridState }) => void;
+  /** Callback when column is made visible/hidden */
+  onColumnVisible?: (event: ColumnEvent<TData>) => void;
+  /** Callback when column is pinned/unpinned */
+  onColumnPinned?: (event: ColumnEvent<TData>) => void;
+  /** Callback when column is resized */
+  onColumnResized?: (event: ColumnEvent<TData>) => void;
+  /** Callback when column is moved */
+  onColumnMoved?: (event: ColumnEvent<TData>) => void;
+  /** Callback when row double clicked */
+  onRowDoubleClicked?: (event: RowClickedEvent<TData>) => void;
+  /** Callback when row group is opened/closed */
+  onRowGroupOpened?: (event: RowGroupOpenedEvent<TData>) => void;
+  /** Callback when body scroll ends */
+  onBodyScrollEnd?: (event: { api: GridApi<TData> }) => void;
 }
 
 /**

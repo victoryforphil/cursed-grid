@@ -14,6 +14,7 @@ export type {
   ColumnState,
   GridOptions,
   CursedGridProps,
+  GridState,
 } from "./types";
 
 // Types - Sorting & Filtering
@@ -21,6 +22,8 @@ export type {
   SortDirection,
   SortModelItem,
   FilterModel,
+  FilterType,
+  FilterParams,
   TextFilterModel,
   NumberFilterModel,
   SetFilterModel,
@@ -38,6 +41,14 @@ export type {
   IGetRowsParams,
 } from "./types";
 
+// Types - Sidebar & Context Menu
+export type {
+  SideBarDef,
+  ToolPanelDef,
+  ContextMenuItem,
+  GetContextMenuItemsParams,
+} from "./types";
+
 // Types - Events
 export type {
   SelectionChangedEvent,
@@ -47,4 +58,6 @@ export type {
   SortChangedEvent,
   FilterChangedEvent,
   ModelUpdatedEvent,
+  ColumnEvent,
+  RowGroupOpenedEvent,
 } from "./types";

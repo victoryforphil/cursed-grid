@@ -24,6 +24,7 @@ import type {
   IServerSideGetRowsRequest,
   IDatasource,
   GridOptions,
+  GridState,
 } from "./types";
 import { useGridState } from "./hooks";
 import {
@@ -346,7 +347,58 @@ export function CursedGrid<TData = unknown>({
       else if (key === "datasource") setCurrentDatasource(value as IDatasource<TData>);
       else if (key === "quickFilterText") setQuickFilterText(value as string);
     },
-  }), [rowData, rowNodes, selectedRowIds, internalColumnDefs, mergedColumnDefs, sortModel, filterModel, serverSideData, rowModelType, cacheBlockSize, loadServerSideData, log, selectAll, deselectAll, setInternalColumnDefs, setSortModel, setFilterModel, setLoadedBlocks, setServerSideData, setCurrentDatasource, setQuickFilterText]);
+    
+    // Display operations
+    ensureIndexVisible: (index, position) => {
+      log("ensureIndexVisible called:", index, position);
+      // TODO: Implement scroll to index
+    },
+    ensureColumnVisible: (colId, position) => {
+      log("ensureColumnVisible called:", colId, position);
+      // TODO: Implement scroll to column
+    },
+    getAllDisplayedColumns: () => visibleColumns,
+    
+    // Row grouping
+    expandAll: () => {
+      log("expandAll called");
+      // TODO: Implement when row grouping is added
+    },
+    collapseAll: () => {
+      log("collapseAll called");
+      // TODO: Implement when row grouping is added
+    },
+    setRowNodeExpanded: (node, expanded, recursive) => {
+      log("setRowNodeExpanded called:", node.id, expanded, recursive);
+      // TODO: Implement when row grouping is added
+    },
+    forEachNode: (callback) => {
+      rowNodes.forEach((node, index) => callback(node, index));
+    },
+    
+    // Selection
+    getSelectedNodes: () => rowNodes.filter((node) => selectedRowIds.has(node.id)),
+    
+    // State persistence
+    getState: () => ({
+      filter: filterModel,
+      sort: sortModel,
+      columnState: mergedColumnDefs.map((col) => ({
+        colId: getColId(col),
+        width: col.width,
+        hide: col.hide,
+        pinned: col.pinned,
+      })),
+    }),
+    getColumnGroupState: () => {
+      log("getColumnGroupState called");
+      return [];
+    },
+    setColumnGroupState: (state) => {
+      log("setColumnGroupState called:", state);
+      // TODO: Implement when column groups are added
+    },
+  }), [rowData, rowNodes, selectedRowIds, internalColumnDefs, mergedColumnDefs, visibleColumns, sortModel, filterModel, serverSideData, rowModelType, cacheBlockSize, loadServerSideData, log, selectAll, deselectAll, setInternalColumnDefs, setSortModel, setFilterModel, setLoadedBlocks, setServerSideData, setCurrentDatasource, setQuickFilterText]);
 
   // ============================================================================
   // COLUMN API
