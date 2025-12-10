@@ -517,6 +517,12 @@ export function CursedGrid<TData = unknown>({
     }
   }, [rowModelType, setFilterModel, setLoadedBlocks, setServerSideData]);
 
+  const handleColumnResize = React.useCallback((colId: string, width: number) => {
+    setInternalColumnDefs((prev) =>
+      prev.map((col) => getColId(col) === colId ? { ...col, width } : col)
+    );
+  }, [setInternalColumnDefs]);
+
   // ============================================================================
   // THEME
   // ============================================================================
@@ -597,6 +603,7 @@ export function CursedGrid<TData = unknown>({
                 onHideColumn={handleHideColumn}
                 onPinColumn={handlePinColumn}
                 onFilterChange={handleMenuFilterChange}
+                onColumnResize={handleColumnResize}
               />
               {hasFloatingFilters && (
                 <FloatingFilters
