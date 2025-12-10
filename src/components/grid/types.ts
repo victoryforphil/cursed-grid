@@ -187,6 +187,11 @@ export type RowModelType = "clientSide" | "serverSide" | "infinite";
 // ============================================================================
 
 /**
+ * Filter type - specifies which filter component to use
+ */
+export type FilterType = "agTextColumnFilter" | "agNumberColumnFilter" | "agDateColumnFilter" | "agSetColumnFilter" | true | false;
+
+/**
  * Column definition - describes a column in the grid
  * Similar to AG Grid's ColDef interface
  */
@@ -207,14 +212,31 @@ export interface ColDef<TData = unknown> {
   flex?: number;
   /** Whether the column is sortable */
   sortable?: boolean;
-  /** Whether the column is filterable */
-  filter?: boolean | string;
+  /** Whether the column is filterable - true, false, or filter type string */
+  filter?: FilterType;
+  /** Whether to show floating filter for this column */
+  floatingFilter?: boolean;
+  /** Filter params for customizing filter behavior */
+  filterParams?: {
+    /** For text filter: filter options to show */
+    filterOptions?: string[];
+    /** For number filter: allow decimals */
+    allowedCharPattern?: string;
+    /** For set filter: values to show */
+    values?: string[];
+    /** Debounce time in ms before applying filter */
+    debounceMs?: number;
+    /** Case sensitive filtering */
+    caseSensitive?: boolean;
+  };
   /** Whether the column is resizable */
   resizable?: boolean;
   /** Whether the column is hidden */
   hide?: boolean;
   /** Pin the column to left or right */
   pinned?: "left" | "right" | null;
+  /** Suppress the column menu */
+  suppressMenu?: boolean;
   /** Custom cell renderer component */
   cellRenderer?: React.ComponentType<CellRendererParams<TData>>;
   /** Custom cell renderer function */

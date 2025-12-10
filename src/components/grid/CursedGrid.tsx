@@ -2,15 +2,7 @@
 
 import * as React from "react";
 import { cn } from "@/lib/utils";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { ChevronUp, ChevronDown, ChevronsUpDown, Loader2 } from "lucide-react";
+import { Table, TableHeader } from "@/components/ui/table";
 import type {
   CursedGridProps,
   ColDef,
@@ -31,71 +23,20 @@ import type {
   IDatasource,
   GridOptions,
 } from "./types";
+import { useGridState } from "./hooks";
+import {
+  GridHeader,
+  FloatingFilters,
+  GridBody,
+  GridPagination,
+  QuickFilter,
+  LoadingOverlay,
+  NoRowsOverlay,
+} from "./components";
+import { getColId, getCellValue } from "./utils";
 
 // Re-export types for convenience
 export * from "./types";
-
-/**
- * Get value from row data using field path
- */
-function getFieldValue<TData>(data: TData, field: string): unknown {
-  if (!field) return undefined;
-  
-  const parts = field.split(".");
-  let value: unknown = data;
-  
-  for (const part of parts) {
-    if (value === null || value === undefined) return undefined;
-    value = (value as Record<string, unknown>)[part];
-  }
-  
-  return value;
-}
-
-/**
- * Generate a unique row ID
- */
-function generateRowId<TData>(
-  data: TData,
-  index: number,
-  getRowId?: (params: { data: TData }) => string
-): string {
-  if (getRowId) {
-    return getRowId({ data });
-  }
-  return `row-${index}`;
-}
-
-/**
- * Create row nodes from row data
- */
-function createRowNodes<TData>(
-  rowData: TData[],
-  getRowId?: (params: { data: TData }) => string,
-  startIndex: number = 0
-): RowNode<TData>[] {
-  return rowData.map((data, index) => ({
-    id: generateRowId(data, startIndex + index, getRowId),
-    data,
-    rowIndex: startIndex + index,
-    isSelected: false,
-  }));
-}
-
-/**
- * Compare function for sorting
- */
-function defaultComparator(valueA: unknown, valueB: unknown): number {
-  if (valueA === valueB) return 0;
-  if (valueA === null || valueA === undefined) return 1;
-  if (valueB === null || valueB === undefined) return -1;
-  
-  if (typeof valueA === "number" && typeof valueB === "number") {
-    return valueA - valueB;
-  }
-  
-  return String(valueA).localeCompare(String(valueB));
-}
 
 /**
  * CursedGrid - A high-performance, AG Grid-compatible data grid component
@@ -113,17 +54,18 @@ export function CursedGrid<TData = unknown>({
   // Server-Side Row Model
   serverSideDatasource,
   cacheBlockSize = 100,
-  serverSideInitialRowCount = 0,
   blockLoadDebounceMillis = 0,
   
   // Infinite Scroll
   datasource,
-  infiniteInitialRowCount = 100,
-  maxConcurrentDatasourceRequests = 2,
   
   // Sorting
   sortable: globalSortable,
   multiSortKey = "ctrl",
+  
+  // Filtering
+  floatingFilter: globalFloatingFilter = false,
+  quickFilterText: externalQuickFilterText,
   
   // Layout
   rowHeight = 40,
@@ -165,123 +107,62 @@ export function CursedGrid<TData = unknown>({
   debug = false,
 }: CursedGridProps<TData>) {
   // ============================================================================
-  // STATE
+  // GRID STATE (via custom hook)
   // ============================================================================
-  const [selectedRowIds, setSelectedRowIds] = React.useState<Set<string>>(new Set());
-  const [currentPage, setCurrentPage] = React.useState(0);
-  const [internalColumnDefs, setInternalColumnDefs] = React.useState<ColDef<TData>[]>(columnDefs);
-  const [sortModel, setSortModel] = React.useState<SortModelItem[]>([]);
-  const [filterModel, setFilterModel] = React.useState<FilterModel>({});
-  
-  // Server-side / Infinite scroll state
-  const [serverSideData, setServerSideData] = React.useState<TData[]>([]);
-  const [isLoading, setIsLoading] = React.useState(false);
-  const [totalRowCount, setTotalRowCount] = React.useState<number>(-1);
-  const [loadedBlocks, setLoadedBlocks] = React.useState<Set<number>>(new Set());
-  const [currentDatasource, setCurrentDatasource] = React.useState<
-    IServerSideDatasource<TData> | IDatasource<TData> | null
-  >(serverSideDatasource || datasource || null);
+  const gridState = useGridState({
+    rowData: rowData ?? [],
+    columnDefs,
+    defaultColDef,
+    rowModelType,
+    getRowId,
+    pagination,
+    paginationPageSize,
+    globalSortable,
+    globalFloatingFilter,
+    serverSideDatasource,
+    datasource,
+    externalQuickFilterText,
+    debug,
+  });
 
-  // Debug logging
-  const log = React.useCallback(
-    (...args: unknown[]) => {
-      if (debug) {
-        console.log("[CursedGrid]", ...args);
-      }
-    },
-    [debug]
-  );
-
-  // ============================================================================
-  // SYNC EXTERNAL PROPS
-  // ============================================================================
-  React.useEffect(() => {
-    setInternalColumnDefs(columnDefs);
-  }, [columnDefs]);
-
-  React.useEffect(() => {
-    if (serverSideDatasource) {
-      setCurrentDatasource(serverSideDatasource);
-    } else if (datasource) {
-      setCurrentDatasource(datasource);
-    }
-  }, [serverSideDatasource, datasource]);
-
-  // ============================================================================
-  // MERGED COLUMN DEFINITIONS
-  // ============================================================================
-  const mergedColumnDefs = React.useMemo(() => {
-    return internalColumnDefs.map((colDef, index) => ({
-      ...defaultColDef,
-      ...colDef,
-      colId: colDef.colId || colDef.field?.toString() || `col-${index}`,
-      sortable: colDef.sortable ?? globalSortable ?? defaultColDef?.sortable ?? false,
-    }));
-  }, [internalColumnDefs, defaultColDef, globalSortable]);
-
-  // ============================================================================
-  // CLIENT-SIDE SORTING
-  // ============================================================================
-  const sortedRowData = React.useMemo(() => {
-    if (rowModelType !== "clientSide" || sortModel.length === 0) {
-      return rowData ?? [];
-    }
-
-    const data = [...(rowData ?? [])];
-    
-    data.sort((a, b) => {
-      for (const sort of sortModel) {
-        const colDef = mergedColumnDefs.find(
-          (col) => (col.colId || col.field?.toString()) === sort.colId
-        );
-        
-        if (!colDef) continue;
-        
-        const valueA = colDef.field ? getFieldValue(a, colDef.field.toString()) : undefined;
-        const valueB = colDef.field ? getFieldValue(b, colDef.field.toString()) : undefined;
-        
-        const comparator = colDef.comparator || defaultComparator;
-        let result = comparator(
-          valueA,
-          valueB,
-          { id: "", data: a, rowIndex: 0, isSelected: false },
-          { id: "", data: b, rowIndex: 0, isSelected: false }
-        );
-        
-        if (sort.sort === "desc") {
-          result = -result;
-        }
-        
-        if (result !== 0) return result;
-      }
-      return 0;
-    });
-
-    return data;
-  }, [rowData, sortModel, mergedColumnDefs, rowModelType]);
-
-  // ============================================================================
-  // ROW NODES
-  // ============================================================================
-  const rowNodes = React.useMemo(() => {
-    if (rowModelType === "serverSide" || rowModelType === "infinite") {
-      return createRowNodes(serverSideData, getRowId);
-    }
-    return createRowNodes(sortedRowData, getRowId);
-  }, [rowModelType, serverSideData, sortedRowData, getRowId]);
-
-  // ============================================================================
-  // PAGINATION
-  // ============================================================================
-  const paginatedRowNodes = React.useMemo(() => {
-    if (!pagination) return rowNodes;
-    const start = currentPage * paginationPageSize;
-    return rowNodes.slice(start, start + paginationPageSize);
-  }, [rowNodes, pagination, currentPage, paginationPageSize]);
-
-  const totalPages = Math.ceil(
-    (totalRowCount > 0 ? totalRowCount : rowNodes.length) / paginationPageSize
-  );
+  const {
+    selectedRowIds,
+    currentPage,
+    setCurrentPage,
+    sortModel,
+    setSortModel,
+    filterModel,
+    setFilterModel,
+    quickFilterText,
+    setQuickFilterText,
+    floatingFilterValues,
+    isLoading,
+    setIsLoading,
+    totalRowCount,
+    setTotalRowCount,
+    loadedBlocks,
+    setLoadedBlocks,
+    serverSideData,
+    setServerSideData,
+    currentDatasource,
+    setCurrentDatasource,
+    mergedColumnDefs,
+    visibleColumns,
+    hasFloatingFilters,
+    filteredRowData,
+    rowNodes,
+    paginatedRowNodes,
+    totalPages,
+    internalColumnDefs,
+    setInternalColumnDefs,
+    handleFloatingFilterChange,
+    clearFloatingFilter,
+    handleSort,
+    selectRow,
+    selectAll,
+    deselectAll,
+    log,
+  } = gridState;
 
   // ============================================================================
   // SERVER-SIDE DATA LOADING
@@ -368,18 +249,16 @@ export function CursedGrid<TData = unknown>({
         });
       }
     },
-    [currentDatasource, rowModelType, cacheBlockSize, loadedBlocks, filterModel, sortModel, log]
+    [currentDatasource, rowModelType, cacheBlockSize, loadedBlocks, filterModel, sortModel, log, setIsLoading, setServerSideData, setTotalRowCount, setLoadedBlocks]
   );
 
   // Initial data load for server-side/infinite
   React.useEffect(() => {
     if ((rowModelType === "serverSide" || rowModelType === "infinite") && currentDatasource) {
-      // Reset state when datasource changes
       setServerSideData([]);
       setLoadedBlocks(new Set());
       setTotalRowCount(-1);
       
-      // Load first block
       const debounceTimer = setTimeout(() => {
         loadServerSideData(0, cacheBlockSize);
       }, blockLoadDebounceMillis);
@@ -392,46 +271,20 @@ export function CursedGrid<TData = unknown>({
   // GRID API
   // ============================================================================
   const gridApi = React.useMemo<GridApi<TData>>(() => ({
-    getRowData: () => {
-      if (rowModelType === "clientSide") {
-        return rowData ?? [];
-      }
-      return serverSideData;
-    },
-    setRowData: (data) => {
-      if (rowModelType === "clientSide") {
-        log("setRowData called - updating internal data");
-        // For client-side, this would need parent to update rowData prop
-      }
-    },
-    getSelectedRows: () => {
-      return rowNodes
-        .filter((node) => selectedRowIds.has(node.id))
-        .map((node) => node.data);
-    },
-    selectAll: () => {
-      setSelectedRowIds(new Set(rowNodes.map((node) => node.id)));
-    },
-    deselectAll: () => {
-      setSelectedRowIds(new Set());
-    },
-    refreshCells: () => {
-      setInternalColumnDefs([...internalColumnDefs]);
-    },
+    getRowData: () => rowModelType === "clientSide" ? (rowData ?? []) : serverSideData,
+    setRowData: () => log("setRowData called"),
+    getSelectedRows: () => rowNodes.filter((node) => selectedRowIds.has(node.id)).map((node) => node.data),
+    selectAll,
+    deselectAll,
+    refreshCells: () => setInternalColumnDefs([...internalColumnDefs]),
     exportDataAsCsv: () => {
-      const headers = mergedColumnDefs
-        .filter((col) => !col.hide)
-        .map((col) => col.headerName || col.field?.toString() || "");
-      
+      const headers = mergedColumnDefs.filter((col) => !col.hide).map((col) => col.headerName || col.field?.toString() || "");
       const rows = rowNodes.map((node) =>
-        mergedColumnDefs
-          .filter((col) => !col.hide)
-          .map((col) => {
-            const value = col.field ? getFieldValue(node.data, col.field.toString()) : "";
-            return String(value ?? "");
-          })
+        mergedColumnDefs.filter((col) => !col.hide).map((col) => {
+          const value = col.field ? getCellValue(node, col) : "";
+          return String(value ?? "");
+        })
       );
-      
       const csv = [headers, ...rows].map((row) => row.join(",")).join("\n");
       const blob = new Blob([csv], { type: "text/csv" });
       const url = URL.createObjectURL(blob);
@@ -443,14 +296,8 @@ export function CursedGrid<TData = unknown>({
     },
     getColumnDefs: () => internalColumnDefs,
     setColumnDefs: (colDefs) => setInternalColumnDefs(colDefs),
-    sizeColumnsToFit: () => {
-      log("sizeColumnsToFit called");
-    },
-    autoSizeAllColumns: () => {
-      log("autoSizeAllColumns called");
-    },
-    
-    // Sorting & Filtering
+    sizeColumnsToFit: () => log("sizeColumnsToFit called"),
+    autoSizeAllColumns: () => log("autoSizeAllColumns called"),
     getSortModel: () => sortModel,
     setSortModel: (newSortModel) => {
       setSortModel(newSortModel);
@@ -467,24 +314,16 @@ export function CursedGrid<TData = unknown>({
         setServerSideData([]);
       }
     },
-    
-    // Server-side
-    setServerSideDatasource: (ds) => {
-      setCurrentDatasource(ds);
-    },
-    refreshServerSide: (params) => {
-      log("refreshServerSide called", params);
+    setServerSideDatasource: (ds) => setCurrentDatasource(ds),
+    refreshServerSide: () => {
+      log("refreshServerSide called");
       setLoadedBlocks(new Set());
       setServerSideData([]);
       loadServerSideData(0, cacheBlockSize);
     },
     getDisplayedRowCount: () => rowNodes.length,
     getRowNode: (id) => rowNodes.find((node) => node.id === id),
-    
-    // Infinite scroll
-    setDatasource: (ds) => {
-      setCurrentDatasource(ds);
-    },
+    setDatasource: (ds) => setCurrentDatasource(ds),
     purgeInfiniteCache: () => {
       setLoadedBlocks(new Set());
       setServerSideData([]);
@@ -494,30 +333,13 @@ export function CursedGrid<TData = unknown>({
       setServerSideData([]);
       loadServerSideData(0, cacheBlockSize);
     },
-    
-    // Generic setter
     setGridOption: <K extends keyof GridOptions<TData>>(key: K, value: GridOptions<TData>[K]) => {
       log("setGridOption called:", key, value);
-      if (key === "serverSideDatasource") {
-        setCurrentDatasource(value as IServerSideDatasource<TData>);
-      } else if (key === "datasource") {
-        setCurrentDatasource(value as IDatasource<TData>);
-      }
+      if (key === "serverSideDatasource") setCurrentDatasource(value as IServerSideDatasource<TData>);
+      else if (key === "datasource") setCurrentDatasource(value as IDatasource<TData>);
+      else if (key === "quickFilterText") setQuickFilterText(value as string);
     },
-  }), [
-    rowData,
-    rowNodes,
-    selectedRowIds,
-    internalColumnDefs,
-    mergedColumnDefs,
-    sortModel,
-    filterModel,
-    serverSideData,
-    rowModelType,
-    cacheBlockSize,
-    loadServerSideData,
-    log,
-  ]);
+  }), [rowData, rowNodes, selectedRowIds, internalColumnDefs, mergedColumnDefs, sortModel, filterModel, serverSideData, rowModelType, cacheBlockSize, loadServerSideData, log, selectAll, deselectAll, setInternalColumnDefs, setSortModel, setFilterModel, setLoadedBlocks, setServerSideData, setCurrentDatasource, setQuickFilterText]);
 
   // ============================================================================
   // COLUMN API
@@ -526,16 +348,12 @@ export function CursedGrid<TData = unknown>({
     getColumns: () => internalColumnDefs,
     setColumnVisible: (colId, visible) => {
       setInternalColumnDefs((prev) =>
-        prev.map((col) =>
-          (col.colId || col.field?.toString()) === colId
-            ? { ...col, hide: !visible }
-            : col
-        )
+        prev.map((col) => getColId(col) === colId ? { ...col, hide: !visible } : col)
       );
     },
     getColumnState: (): ColumnState[] =>
       mergedColumnDefs.map((col) => {
-        const colId = col.colId || col.field?.toString() || "";
+        const colId = getColId(col);
         const sortItem = sortModel.find((s) => s.colId === colId);
         return {
           colId,
@@ -549,13 +367,10 @@ export function CursedGrid<TData = unknown>({
     applyColumnState: (state) => {
       setInternalColumnDefs((prev) =>
         prev.map((col) => {
-          const colState = state.find(
-            (s) => s.colId === (col.colId || col.field?.toString())
-          );
+          const colState = state.find((s) => s.colId === getColId(col));
           return colState ? { ...col, ...colState } : col;
         })
       );
-      // Apply sort from column state
       const newSortModel: SortModelItem[] = state
         .filter((s) => s.sort)
         .sort((a, b) => (a.sortIndex ?? 0) - (b.sortIndex ?? 0))
@@ -564,9 +379,7 @@ export function CursedGrid<TData = unknown>({
     },
     moveColumn: (colId, toIndex) => {
       setInternalColumnDefs((prev) => {
-        const colIndex = prev.findIndex(
-          (col) => (col.colId || col.field?.toString()) === colId
-        );
+        const colIndex = prev.findIndex((col) => getColId(col) === colId);
         if (colIndex === -1) return prev;
         const newCols = [...prev];
         const [col] = newCols.splice(colIndex, 1);
@@ -576,14 +389,10 @@ export function CursedGrid<TData = unknown>({
     },
     setColumnPinned: (colId, pinned) => {
       setInternalColumnDefs((prev) =>
-        prev.map((col) =>
-          (col.colId || col.field?.toString()) === colId
-            ? { ...col, pinned }
-            : col
-        )
+        prev.map((col) => getColId(col) === colId ? { ...col, pinned } : col)
       );
     },
-  }), [internalColumnDefs, mergedColumnDefs, sortModel]);
+  }), [internalColumnDefs, mergedColumnDefs, sortModel, setInternalColumnDefs, setSortModel]);
 
   // ============================================================================
   // REFS
@@ -592,85 +401,47 @@ export function CursedGrid<TData = unknown>({
   const columnApiRef = React.useRef<ColumnApi<TData>>(columnApi);
   const rowNodesRef = React.useRef(rowNodes);
   
-  React.useEffect(() => {
-    gridApiRef.current = gridApi;
-  }, [gridApi]);
-  
-  React.useEffect(() => {
-    columnApiRef.current = columnApi;
-  }, [columnApi]);
-  
-  React.useEffect(() => {
-    rowNodesRef.current = rowNodes;
-  }, [rowNodes]);
+  React.useEffect(() => { gridApiRef.current = gridApi; }, [gridApi]);
+  React.useEffect(() => { columnApiRef.current = columnApi; }, [columnApi]);
+  React.useEffect(() => { rowNodesRef.current = rowNodes; }, [rowNodes]);
 
   // ============================================================================
   // CALLBACKS
   // ============================================================================
-  
-  // Fire onGridReady - only on mount
   const hasCalledGridReady = React.useRef(false);
   React.useEffect(() => {
     if (onGridReady && !hasCalledGridReady.current) {
       hasCalledGridReady.current = true;
-      const event: GridReadyEvent<TData> = {
-        api: gridApiRef.current,
-        columnApi: columnApiRef.current,
-      };
-      onGridReady(event);
+      onGridReady({ api: gridApiRef.current, columnApi: columnApiRef.current });
     }
   }, [onGridReady]);
 
-  // Handle selection change
   const prevSelectedIdsRef = React.useRef<Set<string>>(new Set());
   React.useEffect(() => {
     const prevIds = prevSelectedIdsRef.current;
-    const currentIds = selectedRowIds;
-    
-    const idsChanged = prevIds.size !== currentIds.size || 
-      [...currentIds].some(id => !prevIds.has(id));
-    
+    const idsChanged = prevIds.size !== selectedRowIds.size || [...selectedRowIds].some(id => !prevIds.has(id));
     if (idsChanged && onSelectionChanged) {
-      const selectedRows = rowNodesRef.current
-        .filter((node) => selectedRowIds.has(node.id))
-        .map((node) => node.data);
-      
-      const event: SelectionChangedEvent<TData> = {
+      onSelectionChanged({
         api: gridApiRef.current,
         columnApi: columnApiRef.current,
-        selectedRows,
-      };
-      onSelectionChanged(event);
+        selectedRows: rowNodesRef.current.filter((node) => selectedRowIds.has(node.id)).map((node) => node.data),
+      });
     }
-    
     prevSelectedIdsRef.current = new Set(selectedRowIds);
   }, [selectedRowIds, onSelectionChanged]);
 
-  // Handle sort change
   const prevSortModelRef = React.useRef<SortModelItem[]>([]);
   React.useEffect(() => {
-    const changed = JSON.stringify(prevSortModelRef.current) !== JSON.stringify(sortModel);
-    if (changed && onSortChanged) {
-      const event: SortChangedEvent<TData> = {
-        api: gridApiRef.current,
-        columnApi: columnApiRef.current,
-        source: "uiColumnSorted",
-      };
-      onSortChanged(event);
+    if (JSON.stringify(prevSortModelRef.current) !== JSON.stringify(sortModel) && onSortChanged) {
+      onSortChanged({ api: gridApiRef.current, columnApi: columnApiRef.current, source: "uiColumnSorted" });
     }
     prevSortModelRef.current = sortModel;
   }, [sortModel, onSortChanged]);
 
-  // Handle filter change
   const prevFilterModelRef = React.useRef<FilterModel>({});
   React.useEffect(() => {
-    const changed = JSON.stringify(prevFilterModelRef.current) !== JSON.stringify(filterModel);
-    if (changed && onFilterChanged) {
-      const event: FilterChangedEvent<TData> = {
-        api: gridApiRef.current,
-        columnApi: columnApiRef.current,
-      };
-      onFilterChanged(event);
+    if (JSON.stringify(prevFilterModelRef.current) !== JSON.stringify(filterModel) && onFilterChanged) {
+      onFilterChanged({ api: gridApiRef.current, columnApi: columnApiRef.current });
     }
     prevFilterModelRef.current = filterModel;
   }, [filterModel, onFilterChanged]);
@@ -678,213 +449,23 @@ export function CursedGrid<TData = unknown>({
   // ============================================================================
   // EVENT HANDLERS
   // ============================================================================
-
-  const handleRowClick = (node: RowNode<TData>) => {
+  const handleRowClick = React.useCallback((node: RowNode<TData>) => {
     if (onRowClicked) {
-      const event: RowClickedEvent<TData> = {
-        api: gridApiRef.current,
-        columnApi: columnApiRef.current,
-        data: node.data,
-        rowIndex: node.rowIndex,
-        node,
-      };
-      onRowClicked(event);
+      onRowClicked({ api: gridApiRef.current, columnApi: columnApiRef.current, data: node.data, rowIndex: node.rowIndex, node });
     }
-
     if (rowSelection && !suppressRowClickSelection) {
-      if (rowSelection === "single") {
-        setSelectedRowIds(new Set([node.id]));
-      } else if (rowSelection === "multiple") {
-        setSelectedRowIds((prev) => {
-          const next = new Set(prev);
-          if (next.has(node.id)) {
-            next.delete(node.id);
-          } else {
-            next.add(node.id);
-          }
-          return next;
-        });
-      }
+      selectRow(node.id, rowSelection);
     }
-  };
+  }, [onRowClicked, rowSelection, suppressRowClickSelection, selectRow]);
 
-  const handleCellClick = (
-    node: RowNode<TData>,
-    colDef: ColDef<TData>,
-    value: unknown
-  ) => {
+  const handleCellClick = React.useCallback((node: RowNode<TData>, colDef: ColDef<TData>, value: unknown) => {
     if (onCellClicked) {
-      const event: CellClickedEvent<TData> = {
-        api: gridApiRef.current,
-        columnApi: columnApiRef.current,
-        data: node.data,
-        value,
-        colDef,
-        rowIndex: node.rowIndex,
-        node,
-      };
-      onCellClicked(event);
+      onCellClicked({ api: gridApiRef.current, columnApi: columnApiRef.current, data: node.data, value, colDef, rowIndex: node.rowIndex, node });
     }
-  };
-
-  const handleHeaderClick = (colDef: ColDef<TData>, e: React.MouseEvent) => {
-    if (!colDef.sortable) return;
-
-    const colId = colDef.colId || colDef.field?.toString() || "";
-    const currentSort = sortModel.find((s) => s.colId === colId);
-    const isMultiSort = multiSortKey === "ctrl" ? e.ctrlKey || e.metaKey : e.shiftKey;
-
-    let newSortModel: SortModelItem[];
-
-    if (isMultiSort) {
-      // Multi-sort: add or modify this column in the sort model
-      if (!currentSort) {
-        newSortModel = [...sortModel, { colId, sort: "asc" }];
-      } else if (currentSort.sort === "asc") {
-        newSortModel = sortModel.map((s) =>
-          s.colId === colId ? { ...s, sort: "desc" as const } : s
-        );
-      } else {
-        // Remove from sort
-        newSortModel = sortModel.filter((s) => s.colId !== colId);
-      }
-    } else {
-      // Single sort: replace the entire sort model
-      if (!currentSort) {
-        newSortModel = [{ colId, sort: "asc" }];
-      } else if (currentSort.sort === "asc") {
-        newSortModel = [{ colId, sort: "desc" }];
-      } else {
-        newSortModel = [];
-      }
-    }
-
-    setSortModel(newSortModel);
-    
-    // For server-side, reset cache and reload
-    if (rowModelType !== "clientSide") {
-      setLoadedBlocks(new Set());
-      setServerSideData([]);
-    }
-  };
+  }, [onCellClicked]);
 
   // ============================================================================
-  // CELL RENDERING HELPERS
-  // ============================================================================
-
-  const getCellValue = (node: RowNode<TData>, colDef: ColDef<TData>): unknown => {
-    if (colDef.valueGetter) {
-      return colDef.valueGetter({
-        data: node.data,
-        colDef,
-        node,
-        colId: colDef.colId || colDef.field?.toString() || "",
-      });
-    }
-    
-    if (colDef.field) {
-      return getFieldValue(node.data, colDef.field.toString());
-    }
-    
-    return undefined;
-  };
-
-  const formatCellValue = (
-    node: RowNode<TData>,
-    colDef: ColDef<TData>,
-    value: unknown
-  ): string => {
-    if (colDef.valueFormatter) {
-      return colDef.valueFormatter({
-        value,
-        data: node.data,
-        colDef,
-        node,
-        colId: colDef.colId || colDef.field?.toString() || "",
-      });
-    }
-    
-    if (value === null || value === undefined) {
-      return "";
-    }
-    
-    return String(value);
-  };
-
-  const renderCell = (node: RowNode<TData>, colDef: ColDef<TData>) => {
-    const value = getCellValue(node, colDef);
-    
-    if (colDef.cellRenderer || colDef.cellRendererFramework) {
-      const CellComponent = colDef.cellRenderer || colDef.cellRendererFramework;
-      if (CellComponent) {
-        return (
-          <CellComponent
-            value={value}
-            data={node.data}
-            colDef={colDef}
-            node={node}
-            rowIndex={node.rowIndex}
-            colId={colDef.colId || colDef.field?.toString() || ""}
-          />
-        );
-      }
-    }
-    
-    return formatCellValue(node, colDef, value);
-  };
-
-  const getRowClass = (node: RowNode<TData>): string => {
-    if (typeof rowClass === "function") {
-      return rowClass({ data: node.data, rowIndex: node.rowIndex });
-    }
-    return rowClass || "";
-  };
-
-  const getCellClass = (node: RowNode<TData>, colDef: ColDef<TData>): string => {
-    const value = getCellValue(node, colDef);
-    
-    if (typeof colDef.cellClass === "function") {
-      return colDef.cellClass({
-        value,
-        data: node.data,
-        colDef,
-        node,
-        rowIndex: node.rowIndex,
-        colId: colDef.colId || colDef.field?.toString() || "",
-      });
-    }
-    
-    return colDef.cellClass || "";
-  };
-
-  // ============================================================================
-  // SORT INDICATOR
-  // ============================================================================
-  const getSortIcon = (colDef: ColDef<TData>) => {
-    if (!colDef.sortable) return null;
-
-    const colId = colDef.colId || colDef.field?.toString() || "";
-    const sortItem = sortModel.find((s) => s.colId === colId);
-    const sortIndex = sortModel.length > 1 ? sortModel.findIndex((s) => s.colId === colId) + 1 : null;
-
-    if (!sortItem) {
-      return <ChevronsUpDown className="h-4 w-4 opacity-30" />;
-    }
-
-    return (
-      <span className="inline-flex items-center gap-0.5">
-        {sortItem.sort === "asc" ? (
-          <ChevronUp className="h-4 w-4" />
-        ) : (
-          <ChevronDown className="h-4 w-4" />
-        )}
-        {sortIndex && <span className="text-xs text-muted-foreground">{sortIndex}</span>}
-      </span>
-    );
-  };
-
-  // ============================================================================
-  // THEME CLASSES
+  // THEME
   // ============================================================================
   const themeClasses: Record<string, string> = {
     cursed: "cursed-grid-theme-cursed",
@@ -892,11 +473,6 @@ export function CursedGrid<TData = unknown>({
     balham: "cursed-grid-theme-balham",
     material: "cursed-grid-theme-material",
   };
-
-  // ============================================================================
-  // VISIBLE COLUMNS
-  // ============================================================================
-  const visibleColumns = mergedColumnDefs.filter((col) => !col.hide);
 
   // ============================================================================
   // LOADING STATE
@@ -918,118 +494,64 @@ export function CursedGrid<TData = unknown>({
       )}
       style={style}
     >
-      {/* Loading Overlay */}
-      {showLoading && (
-        <div className="absolute inset-0 flex items-center justify-center bg-background/80 z-10">
-          <div className="flex items-center gap-2 text-muted-foreground">
-            <Loader2 className="h-4 w-4 animate-spin" />
-            {overlayLoadingTemplate}
-          </div>
-        </div>
+      {/* Quick Filter */}
+      {externalQuickFilterText !== undefined && (
+        <QuickFilter
+          value={quickFilterText}
+          onChange={setQuickFilterText}
+        />
       )}
 
+      {/* Loading Overlay */}
+      {showLoading && <LoadingOverlay message={overlayLoadingTemplate} />}
+
       {/* No Rows Overlay */}
-      {showNoRows && (
-        <div className="flex items-center justify-center py-8 text-muted-foreground">
-          {overlayNoRowsTemplate}
-        </div>
-      )}
+      {showNoRows && <NoRowsOverlay message={overlayNoRowsTemplate} />}
 
       {/* Grid Table */}
       {rowNodes.length > 0 && (
         <>
           <Table>
             <TableHeader>
-              <TableRow style={{ height: headerHeight }}>
-                {visibleColumns.map((colDef) => (
-                  <TableHead
-                    key={colDef.colId || colDef.field?.toString()}
-                    className={cn(
-                      colDef.headerClass,
-                      colDef.sortable && "cursor-pointer select-none hover:bg-accent/50",
-                      colDef.pinned === "left" && "sticky left-0 z-10 bg-background",
-                      colDef.pinned === "right" && "sticky right-0 z-10 bg-background"
-                    )}
-                    style={{
-                      width: colDef.width,
-                      minWidth: colDef.minWidth,
-                      maxWidth: colDef.maxWidth,
-                    }}
-                    onClick={(e) => handleHeaderClick(colDef, e)}
-                  >
-                    <div className="flex items-center gap-1">
-                      <span className="flex-1">
-                        {colDef.headerName || colDef.field?.toString() || ""}
-                      </span>
-                      {getSortIcon(colDef)}
-                    </div>
-                  </TableHead>
-                ))}
-              </TableRow>
+              <GridHeader
+                columns={visibleColumns}
+                sortModel={sortModel}
+                headerHeight={headerHeight}
+                multiSortKey={multiSortKey}
+                onSort={handleSort}
+              />
+              {hasFloatingFilters && (
+                <FloatingFilters
+                  columns={visibleColumns}
+                  filterValues={floatingFilterValues}
+                  onFilterChange={handleFloatingFilterChange}
+                  onFilterClear={clearFloatingFilter}
+                />
+              )}
             </TableHeader>
-            <TableBody>
-              {paginatedRowNodes.map((node) => (
-                <TableRow
-                  key={node.id}
-                  className={cn(
-                    getRowClass(node),
-                    selectedRowIds.has(node.id) && "bg-primary/10",
-                    rowSelection && "cursor-pointer",
-                    animateRows && "transition-all duration-200"
-                  )}
-                  style={{ height: rowHeight }}
-                  onClick={() => handleRowClick(node)}
-                  data-state={selectedRowIds.has(node.id) ? "selected" : undefined}
-                >
-                  {visibleColumns.map((colDef) => {
-                    const value = getCellValue(node, colDef);
-                    return (
-                      <TableCell
-                        key={colDef.colId || colDef.field?.toString()}
-                        className={cn(
-                          getCellClass(node, colDef),
-                          colDef.pinned === "left" && "sticky left-0 z-10 bg-background",
-                          colDef.pinned === "right" && "sticky right-0 z-10 bg-background"
-                        )}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleCellClick(node, colDef, value);
-                          handleRowClick(node);
-                        }}
-                      >
-                        {renderCell(node, colDef)}
-                      </TableCell>
-                    );
-                  })}
-                </TableRow>
-              ))}
-            </TableBody>
+            <GridBody
+              rows={paginatedRowNodes}
+              columns={visibleColumns}
+              rowHeight={rowHeight}
+              selectedRowIds={selectedRowIds}
+              rowSelection={rowSelection ?? null}
+              animateRows={animateRows}
+              rowClass={rowClass}
+              onRowClick={handleRowClick}
+              onCellClick={handleCellClick}
+            />
           </Table>
 
           {/* Pagination */}
-          {pagination && totalPages > 1 && (
-            <div className="flex items-center justify-between px-4 py-3 border-t">
-              <div className="text-sm text-muted-foreground">
-                Page {currentPage + 1} of {totalPages}
-                {totalRowCount > 0 && ` (${totalRowCount} total rows)`}
-              </div>
-              <div className="flex gap-2">
-                <button
-                  className="px-3 py-1 text-sm border rounded-md hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed"
-                  onClick={() => setCurrentPage((p) => Math.max(0, p - 1))}
-                  disabled={currentPage === 0}
-                >
-                  Previous
-                </button>
-                <button
-                  className="px-3 py-1 text-sm border rounded-md hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed"
-                  onClick={() => setCurrentPage((p) => Math.min(totalPages - 1, p + 1))}
-                  disabled={currentPage >= totalPages - 1}
-                >
-                  Next
-                </button>
-              </div>
-            </div>
+          {pagination && (
+            <GridPagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              totalRowCount={totalRowCount}
+              filteredCount={rowModelType === "clientSide" ? filteredRowData.length : undefined}
+              originalCount={rowModelType === "clientSide" ? (rowData?.length ?? 0) : undefined}
+              onPageChange={setCurrentPage}
+            />
           )}
         </>
       )}
