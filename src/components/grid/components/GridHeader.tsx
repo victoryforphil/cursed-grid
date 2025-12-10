@@ -4,29 +4,48 @@ import * as React from "react";
 import { cn } from "@/lib/utils";
 import { TableHead, TableRow } from "@/components/ui/table";
 import { ChevronUp, ChevronDown, ChevronsUpDown } from "lucide-react";
-import type { ColDef, SortModelItem } from "../types";
+import type { ColDef, SortModelItem, FilterModel, TextFilterModel, NumberFilterModel } from "../types";
 import { getColId } from "../utils";
+import { ColumnMenu } from "./ColumnMenu";
 
 interface GridHeaderProps<TData> {
   columns: ColDef<TData>[];
   sortModel: SortModelItem[];
+  filterModel: FilterModel;
   headerHeight: number;
   multiSortKey: "ctrl" | "shift";
+  showColumnMenu?: boolean;
   onSort: (colId: string, isMultiSort: boolean) => void;
+  onSortDirect?: (colId: string, direction: "asc" | "desc" | null) => void;
+  onHideColumn?: (colId: string) => void;
+  onPinColumn?: (colId: string, pinned: "left" | "right" | null) => void;
+  onFilterChange?: (colId: string, filter: TextFilterModel | NumberFilterModel | null) => void;
 }
 
 export function GridHeader<TData>({
   columns,
   sortModel,
+  filterModel,
   headerHeight,
   multiSortKey,
+  showColumnMenu = true,
   onSort,
+  onSortDirect,
+  onHideColumn,
+  onPinColumn,
+  onFilterChange,
 }: GridHeaderProps<TData>) {
   const handleHeaderClick = (colDef: ColDef<TData>, e: React.MouseEvent) => {
     if (!colDef.sortable) return;
     const colId = getColId(colDef);
     const isMultiSort = multiSortKey === "ctrl" ? e.ctrlKey || e.metaKey : e.shiftKey;
     onSort(colId, isMultiSort);
+  };
+
+  const handleSortDirect = (colId: string, direction: "asc" | "desc" | null) => {
+    if (onSortDirect) {
+      onSortDirect(colId, direction);
+    }
   };
 
   const getSortIcon = (colDef: ColDef<TData>) => {
@@ -73,14 +92,24 @@ export function GridHeader<TData>({
           onClick={(e) => handleHeaderClick(colDef, e)}
         >
           <div className="flex items-center gap-1">
-            <span className="flex-1">
+            <span className="flex-1 truncate">
               {colDef.headerName || colDef.field?.toString() || ""}
             </span>
             {getSortIcon(colDef)}
+            {showColumnMenu && !colDef.suppressMenu && (
+              <ColumnMenu
+                colDef={colDef}
+                sortModel={sortModel}
+                filterModel={filterModel}
+                onSort={handleSortDirect}
+                onHide={onHideColumn || (() => {})}
+                onPin={onPinColumn || (() => {})}
+                onFilterChange={onFilterChange || (() => {})}
+              />
+            )}
           </div>
         </TableHead>
       ))}
     </TableRow>
   );
 }
-

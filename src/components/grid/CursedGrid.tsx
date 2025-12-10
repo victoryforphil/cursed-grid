@@ -18,6 +18,8 @@ import type {
   ColumnState,
   SortModelItem,
   FilterModel,
+  TextFilterModel,
+  NumberFilterModel,
   IServerSideDatasource,
   IServerSideGetRowsRequest,
   IDatasource,
@@ -464,6 +466,52 @@ export function CursedGrid<TData = unknown>({
     }
   }, [onCellClicked]);
 
+  // Column menu handlers
+  const handleSortDirect = React.useCallback((colId: string, direction: "asc" | "desc" | null) => {
+    if (direction === null) {
+      setSortModel(sortModel.filter((s) => s.colId !== colId));
+    } else {
+      const existing = sortModel.find((s) => s.colId === colId);
+      if (existing) {
+        setSortModel(sortModel.map((s) => s.colId === colId ? { ...s, sort: direction } : s));
+      } else {
+        setSortModel([{ colId, sort: direction }]);
+      }
+    }
+    if (rowModelType !== "clientSide") {
+      setLoadedBlocks(new Set());
+      setServerSideData([]);
+    }
+  }, [sortModel, rowModelType, setSortModel, setLoadedBlocks, setServerSideData]);
+
+  const handleHideColumn = React.useCallback((colId: string) => {
+    setInternalColumnDefs((prev) =>
+      prev.map((col) => getColId(col) === colId ? { ...col, hide: true } : col)
+    );
+  }, [setInternalColumnDefs]);
+
+  const handlePinColumn = React.useCallback((colId: string, pinned: "left" | "right" | null) => {
+    setInternalColumnDefs((prev) =>
+      prev.map((col) => getColId(col) === colId ? { ...col, pinned } : col)
+    );
+  }, [setInternalColumnDefs]);
+
+  const handleMenuFilterChange = React.useCallback((colId: string, filter: TextFilterModel | NumberFilterModel | null) => {
+    if (filter === null) {
+      setFilterModel((prev) => {
+        const next = { ...prev };
+        delete next[colId];
+        return next;
+      });
+    } else {
+      setFilterModel((prev) => ({ ...prev, [colId]: filter }));
+    }
+    if (rowModelType !== "clientSide") {
+      setLoadedBlocks(new Set());
+      setServerSideData([]);
+    }
+  }, [rowModelType, setFilterModel, setLoadedBlocks, setServerSideData]);
+
   // ============================================================================
   // THEME
   // ============================================================================
@@ -516,9 +564,15 @@ export function CursedGrid<TData = unknown>({
               <GridHeader
                 columns={visibleColumns}
                 sortModel={sortModel}
+                filterModel={filterModel}
                 headerHeight={headerHeight}
                 multiSortKey={multiSortKey}
+                showColumnMenu={true}
                 onSort={handleSort}
+                onSortDirect={handleSortDirect}
+                onHideColumn={handleHideColumn}
+                onPinColumn={handlePinColumn}
+                onFilterChange={handleMenuFilterChange}
               />
               {hasFloatingFilters && (
                 <FloatingFilters
