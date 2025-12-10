@@ -10,4 +10,5 @@ export { FiltersPanel, FiltersPanelButton } from "./FiltersPanel";
 export { ContextMenu, defaultContextMenuItems } from "./ContextMenu";
 export { ResizeHandle } from "./ResizeHandle";
 export { SetFilter, extractUniqueValues } from "./SetFilter";
+export { DateFilter, FloatingDateFilter, matchesDateFilter } from "./DateFilter";
 

@@ -59,6 +59,16 @@ export interface SetFilterModel {
   values: (string | null)[];
 }
 
+/**
+ * Date filter model
+ */
+export interface DateFilterModel {
+  filterType: "date";
+  type: "equals" | "notEqual" | "lessThan" | "greaterThan" | "inRange" | "blank" | "notBlank";
+  dateFrom?: string; // ISO date string (YYYY-MM-DD)
+  dateTo?: string;   // For inRange filter
+}
+
 // ============================================================================
 // SERVER-SIDE ROW MODEL TYPES (AG Grid Enterprise 32.3.1 Compatible)
 // ============================================================================

@@ -27,6 +27,7 @@ export type {
   TextFilterModel,
   NumberFilterModel,
   SetFilterModel,
+  DateFilterModel,
 } from "./types";
 
 // Types - Server-Side Row Model (Enterprise)
