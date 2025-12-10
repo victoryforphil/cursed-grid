@@ -817,6 +817,12 @@ export interface GridOptions<TData = unknown> {
   rowSelection?: "single" | "multiple" | null;
   /** Suppress row click selection */
   suppressRowClickSelection?: boolean;
+  
+  // ============================================================================
+  // COLUMN BEHAVIOR
+  // ============================================================================
+  /** Suppress column drag-reorder */
+  suppressMovable?: boolean;
   /** Enable cell selection */
   cellSelection?: boolean;
   /** Enable text selection in cells */

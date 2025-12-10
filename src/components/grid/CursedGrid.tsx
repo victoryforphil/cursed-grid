@@ -81,6 +81,9 @@ export function CursedGrid<TData = unknown>({
   rowSelection,
   suppressRowClickSelection = false,
   
+  // Column Behavior
+  suppressMovable = false,
+  
   // Pagination
   pagination = false,
   paginationPageSize = 10,
@@ -734,6 +737,7 @@ export function CursedGrid<TData = unknown>({
                 headerHeight={headerHeight}
                 multiSortKey={multiSortKey}
                 showColumnMenu={true}
+                suppressMovable={suppressMovable}
                 allRows={rowNodes}
                 selectedRowIds={selectedRowIds}
                 filteredRowIds={filteredRowIds}
@@ -745,6 +749,7 @@ export function CursedGrid<TData = unknown>({
                 onPinColumn={handlePinColumn}
                 onFilterChange={handleMenuFilterChange}
                 onColumnResize={handleColumnResize}
+                onColumnMove={(colId, toIndex) => columnApi.moveColumn(colId, toIndex)}
               />
               {hasFloatingFilters && (
                 <FloatingFilters

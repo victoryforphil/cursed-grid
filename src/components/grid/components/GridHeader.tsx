@@ -17,6 +17,7 @@ interface GridHeaderProps<TData> {
   multiSortKey: "ctrl" | "shift";
   showColumnMenu?: boolean;
   columnFilterValues?: Record<string, (string | null)[]>; // Available values for set filters
+  suppressMovable?: boolean; // Disable column drag-reorder
   // Checkbox selection
   allRows?: RowNode<TData>[];
   selectedRowIds?: Set<string>;
@@ -30,6 +31,7 @@ interface GridHeaderProps<TData> {
   onPinColumn?: (colId: string, pinned: "left" | "right" | null) => void;
   onFilterChange?: (colId: string, filter: TextFilterModel | NumberFilterModel | SetFilterModel | null) => void;
   onColumnResize?: (colId: string, width: number) => void;
+  onColumnMove?: (colId: string, toIndex: number) => void;
 }
 
 export function GridHeader<TData>({
@@ -40,6 +42,7 @@ export function GridHeader<TData>({
   multiSortKey,
   showColumnMenu = true,
   columnFilterValues = {},
+  suppressMovable = false,
   allRows,
   selectedRowIds,
   filteredRowIds,
@@ -51,9 +54,12 @@ export function GridHeader<TData>({
   onPinColumn,
   onFilterChange,
   onColumnResize,
+  onColumnMove,
 }: GridHeaderProps<TData>) {
   // Track column widths during resize
   const [columnWidths, setColumnWidths] = React.useState<Record<string, number>>({});
+  const [draggedColId, setDraggedColId] = React.useState<string | null>(null);
+  const [dragOverColId, setDragOverColId] = React.useState<string | null>(null);
 
   const handleHeaderClick = (colDef: ColDef<TData>, e: React.MouseEvent) => {
     if (!colDef.sortable) return;
@@ -117,6 +123,43 @@ export function GridHeader<TData>({
     return columnWidths[colId] ?? colDef.width;
   };
 
+  // Column drag handlers
+  const handleDragStart = (e: React.DragEvent, colId: string) => {
+    if (suppressMovable) return;
+    e.dataTransfer.effectAllowed = "move";
+    setDraggedColId(colId);
+  };
+
+  const handleDragOver = (e: React.DragEvent, colId: string) => {
+    if (suppressMovable || !draggedColId) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    setDragOverColId(colId);
+  };
+
+  const handleDrop = (e: React.DragEvent, targetColId: string) => {
+    if (suppressMovable || !draggedColId || draggedColId === targetColId) {
+      setDraggedColId(null);
+      setDragOverColId(null);
+      return;
+    }
+
+    e.preventDefault();
+    const toIndex = columns.findIndex((col) => getColId(col) === targetColId);
+    
+    if (toIndex !== -1 && onColumnMove) {
+      onColumnMove(draggedColId, toIndex);
+    }
+    
+    setDraggedColId(null);
+    setDragOverColId(null);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedColId(null);
+    setDragOverColId(null);
+  };
+
   // Calculate checkbox state
   const getCheckboxState = (colDef: ColDef<TData>): "none" | "some" | "all" => {
     if (!allRows || !selectedRowIds) return "none";
@@ -168,15 +211,27 @@ export function GridHeader<TData>({
         const isResizable = colDef.resizable !== false;
         const hasHeaderCheckbox = colDef.headerCheckboxSelection === true;
 
+        const isDragging = draggedColId === colId;
+        const isDragOver = dragOverColId === colId && draggedColId !== colId;
+        const canDrag = !suppressMovable && !colDef.pinned;
+
         return (
           <TableHead
             key={colId}
+            draggable={canDrag}
+            onDragStart={(e) => canDrag && handleDragStart(e, colId)}
+            onDragOver={(e) => handleDragOver(e, colId)}
+            onDrop={(e) => handleDrop(e, colId)}
+            onDragEnd={handleDragEnd}
             className={cn(
               "relative",
               colDef.headerClass,
               colDef.sortable && "cursor-pointer select-none hover:bg-accent/50",
               colDef.pinned === "left" && "sticky left-0 z-10 bg-background",
-              colDef.pinned === "right" && "sticky right-0 z-10 bg-background"
+              colDef.pinned === "right" && "sticky right-0 z-10 bg-background",
+              canDrag && "cursor-move",
+              isDragging && "opacity-50",
+              isDragOver && "border-l-2 border-l-primary"
             )}
             style={{
               width: width,
