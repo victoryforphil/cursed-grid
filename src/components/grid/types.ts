@@ -332,6 +332,12 @@ export interface ColDef<TData = unknown> {
   pinned?: "left" | "right" | null;
   /** Suppress the column menu */
   suppressMenu?: boolean;
+  /** Show checkbox for row selection in this column */
+  checkboxSelection?: boolean | ((params: CellRendererParams<TData>) => boolean);
+  /** Show checkbox in header for select all */
+  headerCheckboxSelection?: boolean;
+  /** Only show header checkbox for filtered rows */
+  headerCheckboxSelectionFilteredOnly?: boolean;
   /** Custom cell renderer component */
   cellRenderer?: React.ComponentType<CellRendererParams<TData>>;
   /** Custom cell renderer function */
@@ -342,8 +348,14 @@ export interface ColDef<TData = unknown> {
   valueFormatter?: (params: ValueFormatterParams<TData>) => string;
   /** CSS class for the cell */
   cellClass?: string | ((params: CellClassParams<TData>) => string);
+  /** Inline styles for the cell */
+  cellStyle?: React.CSSProperties | ((params: CellClassParams<TData>) => React.CSSProperties);
   /** CSS class for the header */
   headerClass?: string;
+  /** Tooltip field name */
+  tooltipField?: string;
+  /** Custom tooltip value getter */
+  tooltipValueGetter?: (params: { value: unknown; data: TData; node: RowNode<TData> }) => string;
   /** Whether column is editable */
   editable?: boolean;
   /** Custom comparator for sorting */
@@ -352,28 +364,6 @@ export interface ColDef<TData = unknown> {
   children?: ColDef<TData>[];
   /** Header group name */
   headerGroupComponent?: React.ComponentType;
-  
-  // Selection
-  /** Show checkbox for selection in this column */
-  checkboxSelection?: boolean | ((params: { data: TData; node: RowNode<TData> }) => boolean);
-  /** Show checkbox in header for select all */
-  headerCheckboxSelection?: boolean;
-  /** Only select filtered rows when using header checkbox */
-  headerCheckboxSelectionFilteredOnly?: boolean;
-  
-  // Tooltips
-  /** Field to use for tooltip */
-  tooltipField?: string;
-  /** Custom tooltip value getter */
-  tooltipValueGetter?: (params: { value: unknown; data: TData; node: RowNode<TData> }) => string;
-  /** Custom tooltip component */
-  tooltipComponent?: React.ComponentType<{ value: string }>;
-  
-  // Cell Styling
-  /** Inline styles for cells */
-  cellStyle?: React.CSSProperties | ((params: CellClassParams<TData>) => React.CSSProperties);
-  /** Auto-adjust row height based on cell content */
-  autoHeight?: boolean;
   
   // Row Grouping
   /** Enable row grouping on this column */

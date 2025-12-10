@@ -96,7 +96,15 @@ export function GridBody<TData>({
     if (!colDef.checkboxSelection) return false;
     
     if (typeof colDef.checkboxSelection === "function") {
-      return colDef.checkboxSelection({ data: node.data, node });
+      const value = getCellValue(node, colDef);
+      return colDef.checkboxSelection({
+        value,
+        data: node.data,
+        colDef,
+        node,
+        rowIndex: node.rowIndex,
+        colId: getColId(colDef),
+      });
     }
     
     return true;

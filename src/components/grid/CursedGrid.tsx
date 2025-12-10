@@ -641,6 +641,23 @@ export function CursedGrid<TData = unknown>({
     );
   }, [setInternalColumnDefs]);
 
+  const handleCheckboxChange = React.useCallback((node: RowNode<TData>, checked: boolean) => {
+    if (rowSelection === "single") {
+      if (checked) {
+        selectRow(node.id, "single");
+      } else {
+        deselectAll();
+      }
+    } else if (rowSelection === "multiple") {
+      selectRow(node.id, "multiple");
+    }
+  }, [rowSelection, selectRow, deselectAll]);
+
+  // Compute filtered row IDs for header checkbox
+  const filteredRowIds = React.useMemo(() => {
+    return new Set(rowNodes.map((node) => node.id));
+  }, [rowNodes]);
+
   // ============================================================================
   // THEME
   // ============================================================================
@@ -717,6 +734,11 @@ export function CursedGrid<TData = unknown>({
                 headerHeight={headerHeight}
                 multiSortKey={multiSortKey}
                 showColumnMenu={true}
+                allRows={rowNodes}
+                selectedRowIds={selectedRowIds}
+                filteredRowIds={filteredRowIds}
+                onSelectAll={selectAll}
+                onDeselectAll={deselectAll}
                 onSort={handleSort}
                 onSortDirect={handleSortDirect}
                 onHideColumn={handleHideColumn}
@@ -743,6 +765,7 @@ export function CursedGrid<TData = unknown>({
               rowClass={rowClass}
               onRowClick={handleRowClick}
               onCellClick={handleCellClick}
+              onCheckboxChange={handleCheckboxChange}
             />
           </Table>
 
