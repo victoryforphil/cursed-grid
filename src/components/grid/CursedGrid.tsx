@@ -304,8 +304,72 @@ export function CursedGrid<TData = unknown>({
     },
     getColumnDefs: () => internalColumnDefs,
     setColumnDefs: (colDefs) => setInternalColumnDefs(colDefs),
-    sizeColumnsToFit: () => log("sizeColumnsToFit called"),
-    autoSizeAllColumns: () => log("autoSizeAllColumns called"),
+    sizeColumnsToFit: (containerWidth) => {
+      log("sizeColumnsToFit called", containerWidth);
+      // Calculate available width (use provided or estimate)
+      const availableWidth = containerWidth || 1200;
+      const cols = visibleColumns.filter((c) => !c.suppressSizeToFit);
+      const fixedWidth = visibleColumns.filter((c) => c.suppressSizeToFit).reduce((sum, c) => sum + (c.width || 100), 0);
+      const flexWidth = availableWidth - fixedWidth;
+      const flexPerColumn = Math.max(50, flexWidth / cols.length);
+      
+      setInternalColumnDefs((prev) =>
+        prev.map((col) => ({
+          ...col,
+          width: col.suppressSizeToFit ? col.width : flexPerColumn,
+        }))
+      );
+    },
+    autoSizeColumn: (colId, skipHeader) => {
+      log("autoSizeColumn called:", colId, skipHeader);
+      // Auto-sizing requires measuring actual content - this is a simplified version
+      setInternalColumnDefs((prev) =>
+        prev.map((col) =>
+          getColId(col) === colId ? { ...col, width: col.minWidth || 100 } : col
+        )
+      );
+    },
+    autoSizeAllColumns: (skipHeader) => {
+      log("autoSizeAllColumns called:", skipHeader);
+      setInternalColumnDefs((prev) =>
+        prev.map((col) => ({ ...col, width: col.minWidth || 100 }))
+      );
+    },
+    setColumnWidth: (colId, width) => {
+      log("setColumnWidth called:", colId, width);
+      setInternalColumnDefs((prev) =>
+        prev.map((col) =>
+          getColId(col) === colId ? { ...col, width: Math.max(col.minWidth || 50, width) } : col
+        )
+      );
+    },
+    setColumnVisible: (colId, visible) => {
+      log("setColumnVisible called:", colId, visible);
+      setInternalColumnDefs((prev) =>
+        prev.map((col) =>
+          getColId(col) === colId ? { ...col, hide: !visible } : col
+        )
+      );
+    },
+    setColumnPinned: (colId, pinned) => {
+      log("setColumnPinned called:", colId, pinned);
+      setInternalColumnDefs((prev) =>
+        prev.map((col) =>
+          getColId(col) === colId ? { ...col, pinned: pinned || undefined } : col
+        )
+      );
+    },
+    moveColumn: (colId, toIndex) => {
+      log("moveColumn called:", colId, toIndex);
+      setInternalColumnDefs((prev) => {
+        const cols = [...prev];
+        const fromIndex = cols.findIndex((c) => getColId(c) === colId);
+        if (fromIndex === -1 || fromIndex === toIndex) return prev;
+        const [col] = cols.splice(fromIndex, 1);
+        cols.splice(toIndex, 0, col);
+        return cols;
+      });
+    },
     getSortModel: () => sortModel,
     setSortModel: (newSortModel) => {
       setSortModel(newSortModel);

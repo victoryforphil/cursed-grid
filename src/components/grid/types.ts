@@ -513,10 +513,20 @@ export interface GridApi<TData = unknown> {
   getColumnDefs: () => ColDef<TData>[];
   /** Set column definitions */
   setColumnDefs: (colDefs: ColDef<TData>[]) => void;
-  /** Size columns to fit */
-  sizeColumnsToFit: () => void;
-  /** Auto-size all columns */
-  autoSizeAllColumns: () => void;
+  /** Size columns to fit available width */
+  sizeColumnsToFit: (containerWidth?: number) => void;
+  /** Auto-size a column based on content */
+  autoSizeColumn: (colId: string, skipHeader?: boolean) => void;
+  /** Auto-size all columns based on content */
+  autoSizeAllColumns: (skipHeader?: boolean) => void;
+  /** Set column width */
+  setColumnWidth: (colId: string, width: number) => void;
+  /** Set column visible */
+  setColumnVisible: (colId: string, visible: boolean) => void;
+  /** Set column pinned */
+  setColumnPinned: (colId: string, pinned: "left" | "right" | null) => void;
+  /** Move column to a new position */
+  moveColumn: (colId: string, toIndex: number) => void;
   
   // Sorting & Filtering
   /** Get the current sort model */
