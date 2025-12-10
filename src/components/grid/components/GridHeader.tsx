@@ -3,8 +3,8 @@
 import * as React from "react";
 import { cn } from "@/lib/utils";
 import { TableHead, TableRow } from "@/components/ui/table";
-import { ChevronUp, ChevronDown, ChevronsUpDown } from "lucide-react";
-import type { ColDef, SortModelItem, FilterModel, TextFilterModel, NumberFilterModel } from "../types";
+import { ChevronUp, ChevronDown, ChevronsUpDown, Check, Minus } from "lucide-react";
+import type { ColDef, SortModelItem, FilterModel, TextFilterModel, NumberFilterModel, RowNode } from "../types";
 import { getColId } from "../utils";
 import { ColumnMenu } from "./ColumnMenu";
 import { ResizeHandle } from "./ResizeHandle";
@@ -16,6 +16,13 @@ interface GridHeaderProps<TData> {
   headerHeight: number;
   multiSortKey: "ctrl" | "shift";
   showColumnMenu?: boolean;
+  // Checkbox selection
+  allRows?: RowNode<TData>[];
+  selectedRowIds?: Set<string>;
+  filteredRowIds?: Set<string>;
+  onSelectAll?: () => void;
+  onDeselectAll?: () => void;
+  // Callbacks
   onSort: (colId: string, isMultiSort: boolean) => void;
   onSortDirect?: (colId: string, direction: "asc" | "desc" | null) => void;
   onHideColumn?: (colId: string) => void;
@@ -31,6 +38,11 @@ export function GridHeader<TData>({
   headerHeight,
   multiSortKey,
   showColumnMenu = true,
+  allRows,
+  selectedRowIds,
+  filteredRowIds,
+  onSelectAll,
+  onDeselectAll,
   onSort,
   onSortDirect,
   onHideColumn,
@@ -43,8 +55,8 @@ export function GridHeader<TData>({
 
   const handleHeaderClick = (colDef: ColDef<TData>, e: React.MouseEvent) => {
     if (!colDef.sortable) return;
-    // Don't sort if clicking on menu or resize handle
-    if ((e.target as HTMLElement).closest('.column-menu, .resize-handle')) return;
+    // Don't sort if clicking on menu, resize handle, or checkbox
+    if ((e.target as HTMLElement).closest('.column-menu, .resize-handle, .header-checkbox')) return;
     
     const colId = getColId(colDef);
     const isMultiSort = multiSortKey === "ctrl" ? e.ctrlKey || e.metaKey : e.shiftKey;
@@ -103,12 +115,56 @@ export function GridHeader<TData>({
     return columnWidths[colId] ?? colDef.width;
   };
 
+  // Calculate checkbox state
+  const getCheckboxState = (colDef: ColDef<TData>): "none" | "some" | "all" => {
+    if (!allRows || !selectedRowIds) return "none";
+    
+    // If headerCheckboxSelectionFilteredOnly, only consider filtered rows
+    const rowsToCheck = colDef.headerCheckboxSelectionFilteredOnly && filteredRowIds
+      ? allRows.filter((row) => filteredRowIds.has(row.id))
+      : allRows;
+    
+    if (rowsToCheck.length === 0) return "none";
+    
+    const selectedCount = rowsToCheck.filter((row) => selectedRowIds.has(row.id)).length;
+    
+    if (selectedCount === 0) return "none";
+    if (selectedCount === rowsToCheck.length) return "all";
+    return "some";
+  };
+
+  const renderHeaderCheckbox = (colDef: ColDef<TData>) => {
+    const state = getCheckboxState(colDef);
+    
+    return (
+      <div
+        className={cn(
+          "header-checkbox flex items-center justify-center w-4 h-4 border rounded cursor-pointer",
+          state === "all" ? "bg-primary border-primary" : "border-muted-foreground hover:border-primary",
+          state === "some" && "bg-primary/50 border-primary"
+        )}
+        onClick={(e) => {
+          e.stopPropagation();
+          if (state === "all") {
+            onDeselectAll?.();
+          } else {
+            onSelectAll?.();
+          }
+        }}
+      >
+        {state === "all" && <Check className="h-3 w-3 text-primary-foreground" />}
+        {state === "some" && <Minus className="h-3 w-3 text-primary-foreground" />}
+      </div>
+    );
+  };
+
   return (
     <TableRow style={{ height: headerHeight }}>
       {columns.map((colDef) => {
         const colId = getColId(colDef);
         const width = getColumnWidth(colDef);
         const isResizable = colDef.resizable !== false;
+        const hasHeaderCheckbox = colDef.headerCheckboxSelection === true;
 
         return (
           <TableHead
@@ -128,6 +184,11 @@ export function GridHeader<TData>({
             onClick={(e) => handleHeaderClick(colDef, e)}
           >
             <div className="flex items-center gap-1 pr-2">
+              {hasHeaderCheckbox && (
+                <div className="mr-1">
+                  {renderHeaderCheckbox(colDef)}
+                </div>
+              )}
               <span className="flex-1 truncate">
                 {colDef.headerName || colDef.field?.toString() || ""}
               </span>
