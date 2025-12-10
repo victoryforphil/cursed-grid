@@ -5,4 +5,5 @@ export { GridPagination } from "./GridPagination";
 export { QuickFilter } from "./QuickFilter";
 export { LoadingOverlay, NoRowsOverlay } from "./GridOverlay";
 export { ColumnMenu } from "./ColumnMenu";
+export { ColumnsPanel, ColumnsPanelButton } from "./ColumnsPanel";
 

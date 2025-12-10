@@ -633,6 +633,14 @@ export interface GridOptions<TData = unknown> {
   theme?: "cursed" | "alpine" | "balham" | "material";
   
   // ============================================================================
+  // TOOLBAR / SIDE BAR
+  // ============================================================================
+  /** Show the columns panel button in toolbar. Default: false */
+  showColumnsPanel?: boolean;
+  /** Show built-in toolbar. Default: false (toolbar is externally controlled) */
+  showToolbar?: boolean;
+  
+  // ============================================================================
   // IDENTIFICATION
   // ============================================================================
   /** Get row ID function */

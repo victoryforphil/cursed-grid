@@ -34,6 +34,7 @@ import {
   QuickFilter,
   LoadingOverlay,
   NoRowsOverlay,
+  ColumnsPanelButton,
 } from "./components";
 import { getColId, getCellValue } from "./utils";
 
@@ -86,6 +87,10 @@ export function CursedGrid<TData = unknown>({
   animateRows = false,
   rowClass,
   theme = "cursed",
+  
+  // Toolbar
+  showColumnsPanel = false,
+  showToolbar = false,
   
   // Identification
   getRowId,
@@ -542,12 +547,31 @@ export function CursedGrid<TData = unknown>({
       )}
       style={style}
     >
-      {/* Quick Filter */}
-      {externalQuickFilterText !== undefined && (
-        <QuickFilter
-          value={quickFilterText}
-          onChange={setQuickFilterText}
-        />
+      {/* Toolbar */}
+      {(showToolbar || showColumnsPanel || externalQuickFilterText !== undefined) && (
+        <div className="flex items-center gap-2 px-3 py-2 border-b bg-muted/30">
+          {/* Quick Filter */}
+          {externalQuickFilterText !== undefined && (
+            <div className="flex-1">
+              <QuickFilter
+                value={quickFilterText}
+                onChange={setQuickFilterText}
+              />
+            </div>
+          )}
+          
+          {/* Columns Panel Button */}
+          {showColumnsPanel && (
+            <ColumnsPanelButton
+              columns={mergedColumnDefs}
+              onColumnVisibilityChange={(colId, visible) => {
+                setInternalColumnDefs((prev) =>
+                  prev.map((col) => getColId(col) === colId ? { ...col, hide: !visible } : col)
+                );
+              }}
+            />
+          )}
+        </div>
       )}
 
       {/* Loading Overlay */}
