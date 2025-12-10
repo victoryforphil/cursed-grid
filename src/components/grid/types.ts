@@ -1,7 +1,190 @@
 /**
  * CursedGrid Types
  * AG Grid-compatible type definitions for the CursedGrid component library
+ * Compatible with AG Grid Enterprise 32.3.1
  */
+
+// ============================================================================
+// SORTING TYPES
+// ============================================================================
+
+/**
+ * Sort direction
+ */
+export type SortDirection = "asc" | "desc" | null;
+
+/**
+ * Sort model item - describes how a column is sorted
+ */
+export interface SortModelItem {
+  /** Column ID */
+  colId: string;
+  /** Sort direction */
+  sort: "asc" | "desc";
+}
+
+// ============================================================================
+// FILTER TYPES
+// ============================================================================
+
+/**
+ * Filter model - key-value pairs of column ID to filter state
+ */
+export type FilterModel = Record<string, unknown>;
+
+/**
+ * Text filter model
+ */
+export interface TextFilterModel {
+  filterType: "text";
+  type: "contains" | "notContains" | "equals" | "notEqual" | "startsWith" | "endsWith" | "blank" | "notBlank";
+  filter?: string;
+}
+
+/**
+ * Number filter model
+ */
+export interface NumberFilterModel {
+  filterType: "number";
+  type: "equals" | "notEqual" | "greaterThan" | "greaterThanOrEqual" | "lessThan" | "lessThanOrEqual" | "inRange" | "blank" | "notBlank";
+  filter?: number;
+  filterTo?: number;
+}
+
+/**
+ * Set filter model
+ */
+export interface SetFilterModel {
+  filterType: "set";
+  values: (string | null)[];
+}
+
+// ============================================================================
+// SERVER-SIDE ROW MODEL TYPES (AG Grid Enterprise 32.3.1 Compatible)
+// ============================================================================
+
+/**
+ * Column specification for row grouping
+ */
+export interface ColumnVO {
+  id: string;
+  displayName: string;
+  field?: string;
+  aggFunc?: string;
+}
+
+/**
+ * Server-side get rows request - parameters sent to the server
+ * Compatible with AG Grid's IServerSideGetRowsRequest
+ */
+export interface IServerSideGetRowsRequest {
+  /** First row requested */
+  startRow: number;
+  /** Last row requested (exclusive) */
+  endRow: number;
+  /** Columns that are currently row grouped */
+  rowGroupCols: ColumnVO[];
+  /** Columns that have aggregations on them */
+  valueCols: ColumnVO[];
+  /** Columns that have pivot on them */
+  pivotCols: ColumnVO[];
+  /** Whether pivot mode is on or off */
+  pivotMode: boolean;
+  /** What groups the user is viewing */
+  groupKeys: string[];
+  /** Filter model */
+  filterModel: FilterModel;
+  /** Sort model */
+  sortModel: SortModelItem[];
+}
+
+/**
+ * Server-side get rows params - passed to datasource getRows
+ * Compatible with AG Grid's IServerSideGetRowsParams
+ */
+export interface IServerSideGetRowsParams<TData = unknown> {
+  /** Request details */
+  request: IServerSideGetRowsRequest;
+  /** Parent row node (for grouped data) */
+  parentNode: RowNode<TData> | null;
+  /** Callback to call when rows retrieved successfully */
+  success: (params: LoadSuccessParams<TData>) => void;
+  /** Callback to call when loading fails */
+  fail: () => void;
+  /** The grid api */
+  api: GridApi<TData>;
+  /** The column api */
+  columnApi: ColumnApi<TData>;
+}
+
+/**
+ * Success callback params
+ */
+export interface LoadSuccessParams<TData = unknown> {
+  /** Row data loaded */
+  rowData: TData[];
+  /** Total row count (-1 if unknown) */
+  rowCount?: number;
+  /** Group info for tree/grouped data */
+  groupLevelInfo?: unknown;
+}
+
+/**
+ * Server-side datasource interface
+ * Compatible with AG Grid's IServerSideDatasource
+ */
+export interface IServerSideDatasource<TData = unknown> {
+  /** Called when the grid needs rows */
+  getRows: (params: IServerSideGetRowsParams<TData>) => void;
+  /** Optional destroy method */
+  destroy?: () => void;
+}
+
+/**
+ * Infinite scroll datasource interface (simpler than server-side)
+ * Compatible with AG Grid's IDatasource
+ */
+export interface IDatasource<TData = unknown> {
+  /** Called when the grid needs rows */
+  getRows: (params: IGetRowsParams<TData>) => void;
+  /** Optional destroy method */
+  destroy?: () => void;
+  /** Optional row count (if known) */
+  rowCount?: number;
+}
+
+/**
+ * Infinite scroll get rows params
+ */
+export interface IGetRowsParams<TData = unknown> {
+  /** First row requested */
+  startRow: number;
+  /** Last row requested */
+  endRow: number;
+  /** Sort model */
+  sortModel: SortModelItem[];
+  /** Filter model */
+  filterModel: FilterModel;
+  /** Callback for success */
+  successCallback: (rowsThisBlock: TData[], lastRow?: number) => void;
+  /** Callback for failure */
+  failCallback: () => void;
+  /** Context object (if any) */
+  context?: unknown;
+}
+
+// ============================================================================
+// ROW MODEL TYPES
+// ============================================================================
+
+/**
+ * Row model type
+ */
+export type RowModelType = "clientSide" | "serverSide" | "infinite";
+
+// ============================================================================
+// COLUMN DEFINITION
+// ============================================================================
 
 /**
  * Column definition - describes a column in the grid
@@ -142,11 +325,12 @@ export interface CellClassParams<TData = unknown> {
 
 /**
  * Grid API for programmatic control
+ * Compatible with AG Grid's GridApi
  */
 export interface GridApi<TData = unknown> {
-  /** Get all row data */
+  /** Get all row data (client-side only) */
   getRowData: () => TData[];
-  /** Set row data */
+  /** Set row data (client-side only) */
   setRowData: (data: TData[]) => void;
   /** Get selected rows */
   getSelectedRows: () => TData[];
@@ -166,6 +350,38 @@ export interface GridApi<TData = unknown> {
   sizeColumnsToFit: () => void;
   /** Auto-size all columns */
   autoSizeAllColumns: () => void;
+  
+  // Sorting & Filtering
+  /** Get the current sort model */
+  getSortModel: () => SortModelItem[];
+  /** Set the sort model */
+  setSortModel: (sortModel: SortModelItem[]) => void;
+  /** Get the current filter model */
+  getFilterModel: () => FilterModel;
+  /** Set the filter model (pass null to clear) */
+  setFilterModel: (filterModel: FilterModel | null) => void;
+  
+  // Server-side row model
+  /** Set the server-side datasource */
+  setServerSideDatasource: (datasource: IServerSideDatasource<TData>) => void;
+  /** Refresh the server-side store */
+  refreshServerSide: (params?: { route?: string[]; purge?: boolean }) => void;
+  /** Get displayed row count */
+  getDisplayedRowCount: () => number;
+  /** Get a row node by ID */
+  getRowNode: (id: string) => RowNode<TData> | undefined;
+  
+  // Infinite scroll
+  /** Set the infinite scroll datasource */
+  setDatasource: (datasource: IDatasource<TData>) => void;
+  /** Purge the infinite scroll cache */
+  purgeInfiniteCache: () => void;
+  /** Refresh infinite cache */
+  refreshInfiniteCache: () => void;
+  
+  // Generic grid option setter (AG Grid 32+ style)
+  /** Set a single grid option dynamically */
+  setGridOption: <K extends keyof GridOptions<TData>>(key: K, value: GridOptions<TData>[K]) => void;
 }
 
 /**
@@ -198,18 +414,6 @@ export interface ColumnState {
   sortIndex?: number;
 }
 
-/**
- * Sort model
- */
-export interface SortModelItem {
-  colId: string;
-  sort: "asc" | "desc";
-}
-
-/**
- * Filter model
- */
-export type FilterModel = Record<string, unknown>;
 
 /**
  * Selection changed event
@@ -253,46 +457,122 @@ export interface GridReadyEvent<TData = unknown> {
 }
 
 /**
+ * Sort changed event
+ */
+export interface SortChangedEvent<TData = unknown> {
+  api: GridApi<TData>;
+  columnApi: ColumnApi<TData>;
+  source: "api" | "uiColumnSorted";
+}
+
+/**
+ * Filter changed event
+ */
+export interface FilterChangedEvent<TData = unknown> {
+  api: GridApi<TData>;
+  columnApi: ColumnApi<TData>;
+}
+
+/**
+ * Model updated event (fired when data changes)
+ */
+export interface ModelUpdatedEvent<TData = unknown> {
+  api: GridApi<TData>;
+  columnApi: ColumnApi<TData>;
+  /** True if this is the first time data is rendered */
+  newData: boolean;
+  /** True if pagination has changed */
+  newPage: boolean;
+  /** True if animation has finished */
+  animate: boolean;
+  /** True if data is finished loading */
+  keepRenderedRows: boolean;
+}
+
+/**
  * Main Grid Options - configuration for the CursedGrid
- * Similar to AG Grid's GridOptions interface
+ * Compatible with AG Grid's GridOptions interface (Enterprise 32.3.1)
  */
 export interface GridOptions<TData = unknown> {
-  /** Row data to display */
+  // ============================================================================
+  // DATA
+  // ============================================================================
+  /** Row data to display (client-side row model only) */
   rowData?: TData[] | null;
   /** Column definitions */
   columnDefs?: ColDef<TData>[];
   /** Default column definition (applied to all columns) */
   defaultColDef?: Partial<ColDef<TData>>;
+  
+  // ============================================================================
+  // ROW MODEL
+  // ============================================================================
+  /** Type of row model: 'clientSide', 'serverSide', or 'infinite' */
+  rowModelType?: RowModelType;
+  
+  // ============================================================================
+  // SERVER-SIDE ROW MODEL (Enterprise)
+  // ============================================================================
+  /** Datasource for server-side row model */
+  serverSideDatasource?: IServerSideDatasource<TData>;
+  /** Number of rows per block in the server-side cache. Default: 100 */
+  cacheBlockSize?: number;
+  /** Maximum number of blocks in cache. Default: unlimited for full store */
+  maxBlocksInCache?: number;
+  /** Initial row count while loading first data. Default: 0 */
+  serverSideInitialRowCount?: number;
+  /** Purge closed row nodes from cache. Default: false */
+  purgeClosedRowNodes?: boolean;
+  /** Suppress infinite scroll for server-side (use full store). Default: false */
+  suppressServerSideInfiniteScroll?: boolean;
+  /** Apply sorting on all levels (not just leaf). Default: false */
+  serverSideSortAllLevels?: boolean;
+  /** Only refresh filtered groups. Default: false */
+  serverSideOnlyRefreshFilteredGroups?: boolean;
+  /** Debounce time before loading blocks (ms). Default: 0 */
+  blockLoadDebounceMillis?: number;
+  
+  // ============================================================================
+  // INFINITE SCROLL ROW MODEL
+  // ============================================================================
+  /** Datasource for infinite scroll row model */
+  datasource?: IDatasource<TData>;
+  /** Size of the cache for infinite scroll. Default: 100 */
+  cacheOverflowSize?: number;
+  /** Max concurrent datasource requests. Default: 2 */
+  maxConcurrentDatasourceRequests?: number;
+  /** Infinite scroll initial row count */
+  infiniteInitialRowCount?: number;
+  
+  // ============================================================================
+  // SORTING
+  // ============================================================================
+  /** Enable sorting on all columns. Overridden by column sortable. */
+  sortable?: boolean;
+  /** Multi-sort key: 'ctrl' or 'shift'. Default: 'ctrl' */
+  multiSortKey?: "ctrl" | "shift";
+  /** Allow unsort (back to no sort). Default: true */
+  unSortIcon?: boolean;
+  /** Always show the sort icon, not just when sorted. Default: false */
+  alwaysShowVerticalScroll?: boolean;
+  
+  // ============================================================================
+  // FILTERING
+  // ============================================================================
+  /** Enable filtering on all columns. Overridden by column filter. */
+  filter?: boolean;
+  /** Float filters at top. Default: false */
+  floatingFilter?: boolean;
+  /** Quick filter text */
+  quickFilterText?: string;
+  
+  // ============================================================================
+  // LAYOUT
+  // ============================================================================
   /** Row height in pixels */
   rowHeight?: number;
   /** Header height in pixels */
   headerHeight?: number;
-  /** Enable row selection */
-  rowSelection?: "single" | "multiple" | null;
-  /** Suppress row click selection */
-  suppressRowClickSelection?: boolean;
-  /** Enable pagination */
-  pagination?: boolean;
-  /** Page size */
-  paginationPageSize?: number;
-  /** Enable animation */
-  animateRows?: boolean;
-  /** Row class */
-  rowClass?: string | ((params: { data: TData; rowIndex: number }) => string);
-  /** Get row ID function */
-  getRowId?: (params: { data: TData }) => string;
-  /** Callback when grid is ready */
-  onGridReady?: (event: GridReadyEvent<TData>) => void;
-  /** Callback when selection changes */
-  onSelectionChanged?: (event: SelectionChangedEvent<TData>) => void;
-  /** Callback when cell is clicked */
-  onCellClicked?: (event: CellClickedEvent<TData>) => void;
-  /** Callback when row is clicked */
-  onRowClicked?: (event: RowClickedEvent<TData>) => void;
-  /** Enable overlay loading */
-  overlayLoadingTemplate?: string;
-  /** Enable overlay no rows */
-  overlayNoRowsTemplate?: string;
   /** DOM layout */
   domLayout?: "normal" | "autoHeight" | "print";
   /** Suppress horizontal scroll */
@@ -301,8 +581,66 @@ export interface GridOptions<TData = unknown> {
   suppressColumnVirtualisation?: boolean;
   /** Suppress row virtualization */
   suppressRowVirtualisation?: boolean;
+  
+  // ============================================================================
+  // SELECTION
+  // ============================================================================
+  /** Enable row selection */
+  rowSelection?: "single" | "multiple" | null;
+  /** Suppress row click selection */
+  suppressRowClickSelection?: boolean;
+  
+  // ============================================================================
+  // PAGINATION
+  // ============================================================================
+  /** Enable pagination */
+  pagination?: boolean;
+  /** Page size */
+  paginationPageSize?: number;
+  /** Pagination panel page size options */
+  paginationPageSizeSelector?: number[] | boolean;
+  
+  // ============================================================================
+  // APPEARANCE
+  // ============================================================================
+  /** Enable animation */
+  animateRows?: boolean;
+  /** Row class */
+  rowClass?: string | ((params: { data: TData; rowIndex: number }) => string);
   /** Theme */
   theme?: "cursed" | "alpine" | "balham" | "material";
+  
+  // ============================================================================
+  // IDENTIFICATION
+  // ============================================================================
+  /** Get row ID function */
+  getRowId?: (params: { data: TData }) => string;
+  
+  // ============================================================================
+  // OVERLAYS
+  // ============================================================================
+  /** Loading overlay template */
+  overlayLoadingTemplate?: string;
+  /** No rows overlay template */
+  overlayNoRowsTemplate?: string;
+  
+  // ============================================================================
+  // CALLBACKS / EVENTS
+  // ============================================================================
+  /** Callback when grid is ready */
+  onGridReady?: (event: GridReadyEvent<TData>) => void;
+  /** Callback when selection changes */
+  onSelectionChanged?: (event: SelectionChangedEvent<TData>) => void;
+  /** Callback when cell is clicked */
+  onCellClicked?: (event: CellClickedEvent<TData>) => void;
+  /** Callback when row is clicked */
+  onRowClicked?: (event: RowClickedEvent<TData>) => void;
+  /** Callback when sort changes */
+  onSortChanged?: (event: SortChangedEvent<TData>) => void;
+  /** Callback when filter changes */
+  onFilterChanged?: (event: FilterChangedEvent<TData>) => void;
+  /** Callback when model is updated */
+  onModelUpdated?: (event: ModelUpdatedEvent<TData>) => void;
 }
 
 /**
@@ -313,6 +651,8 @@ export interface CursedGridProps<TData = unknown> extends GridOptions<TData> {
   className?: string;
   /** CSS style */
   style?: React.CSSProperties;
-  /** Loading state */
+  /** Loading state (externally controlled) */
   loading?: boolean;
+  /** Debug mode - logs events and state changes */
+  debug?: boolean;
 }

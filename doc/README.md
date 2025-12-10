@@ -33,7 +33,7 @@ function App() {
 
 ## Features
 
-- ✅ AG Grid-compatible API
+- ✅ AG Grid-compatible API (Enterprise 32.3.1)
 - ✅ TypeScript support
 - ✅ Row selection (single/multiple)
 - ✅ Pagination
@@ -44,14 +44,22 @@ function App() {
 - ✅ Export to CSV
 - ✅ Dark mode support
 - ✅ Storybook documentation
+- ✅ **Server-Side Row Model** (Enterprise)
+- ✅ **Infinite Scroll Row Model**
+- ✅ **Client-Side & Server-Side Sorting**
+- ✅ **Multi-column sorting** (Ctrl+click)
+- ✅ IServerSideDatasource interface
+- ✅ IDatasource interface (infinite scroll)
+- ✅ api.setGridOption() (v32+ API style)
 
 ## Roadmap
 
-- [ ] Sorting
-- [ ] Filtering
+- [ ] Client-side filtering
+- [ ] Server-side filtering
 - [ ] Column resizing
 - [ ] Row grouping
 - [ ] Tree data
-- [ ] Virtual scrolling
+- [ ] Virtual scrolling (row virtualization)
 - [ ] Column reordering
 - [ ] Editable cells
+- [ ] Floating filters

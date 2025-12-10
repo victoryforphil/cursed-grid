@@ -23,11 +23,11 @@ const sampleData: Person[] = [
 ];
 
 const columnDefs: ColDef<Person>[] = [
-  { field: "id", headerName: "ID", width: 80 },
-  { field: "name", headerName: "Name", minWidth: 150 },
-  { field: "email", headerName: "Email", minWidth: 200 },
-  { field: "age", headerName: "Age", width: 100 },
-  { field: "city", headerName: "City", minWidth: 120 },
+  { field: "id", headerName: "ID", width: 80, sortable: true },
+  { field: "name", headerName: "Name", minWidth: 150, sortable: true },
+  { field: "email", headerName: "Email", minWidth: 200, sortable: true },
+  { field: "age", headerName: "Age", width: 100, sortable: true },
+  { field: "city", headerName: "City", minWidth: 120, sortable: true },
 ];
 
 const meta: Meta<typeof CursedGrid<Person>> = {
@@ -49,6 +49,10 @@ const meta: Meta<typeof CursedGrid<Person>> = {
     domLayout: {
       control: "select",
       options: ["normal", "autoHeight", "print"],
+    },
+    rowModelType: {
+      control: "select",
+      options: ["clientSide", "serverSide", "infinite"],
     },
   },
 };
