@@ -20,6 +20,7 @@ import type {
   FilterModel,
   TextFilterModel,
   NumberFilterModel,
+  SetFilterModel,
   IServerSideDatasource,
   IServerSideGetRowsRequest,
   IDatasource,
@@ -157,6 +158,7 @@ export function CursedGrid<TData = unknown>({
     mergedColumnDefs,
     visibleColumns,
     hasFloatingFilters,
+    columnFilterValues,
     filteredRowData,
     rowNodes,
     paginatedRowNodes,
@@ -617,7 +619,7 @@ export function CursedGrid<TData = unknown>({
     );
   }, [setInternalColumnDefs]);
 
-  const handleMenuFilterChange = React.useCallback((colId: string, filter: TextFilterModel | NumberFilterModel | null) => {
+  const handleMenuFilterChange = React.useCallback((colId: string, filter: TextFilterModel | NumberFilterModel | SetFilterModel | null) => {
     if (filter === null) {
       setFilterModel((prev) => {
         const next = { ...prev };
@@ -711,6 +713,7 @@ export function CursedGrid<TData = unknown>({
                 columns={visibleColumns}
                 sortModel={sortModel}
                 filterModel={filterModel}
+                columnFilterValues={columnFilterValues}
                 headerHeight={headerHeight}
                 multiSortKey={multiSortKey}
                 showColumnMenu={true}

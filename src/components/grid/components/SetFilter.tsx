@@ -8,110 +8,124 @@ import type { SetFilterModel } from "../types";
 interface SetFilterProps {
   values: (string | null)[];
   selectedValues: (string | null)[];
-  onChange: (values: (string | null)[]) => void;
-  onApply?: () => void;
-  onClear?: () => void;
-  showButtons?: boolean;
-  placeholder?: string;
+  onApply: (selectedValues: (string | null)[]) => void;
+  onClear: () => void;
+  searchable?: boolean;
+  defaultToNothingSelected?: boolean;
 }
 
 export function SetFilter({
   values,
-  selectedValues,
-  onChange,
+  selectedValues: initialSelectedValues,
   onApply,
   onClear,
-  showButtons = true,
-  placeholder = "Search...",
+  searchable = true,
+  defaultToNothingSelected = false,
 }: SetFilterProps) {
+  const [selectedValues, setSelectedValues] = React.useState<Set<string | null>>(
+    new Set(initialSelectedValues)
+  );
   const [searchTerm, setSearchTerm] = React.useState("");
 
   const filteredValues = values.filter((value) => {
-    const displayValue = value === null ? "(Blanks)" : value;
-    return displayValue.toLowerCase().includes(searchTerm.toLowerCase());
+    if (!searchTerm) return true;
+    const strValue = String(value ?? "(Blanks)").toLowerCase();
+    return strValue.includes(searchTerm.toLowerCase());
   });
 
-  const allSelected = filteredValues.every((v) => selectedValues.includes(v));
-  const noneSelected = filteredValues.every((v) => !selectedValues.includes(v));
+  const isAllSelected = filteredValues.every((v) => selectedValues.has(v));
+  const isNoneSelected = filteredValues.every((v) => !selectedValues.has(v));
 
   const handleToggle = (value: string | null) => {
-    if (selectedValues.includes(value)) {
-      onChange(selectedValues.filter((v) => v !== value));
-    } else {
-      onChange([...selectedValues, value]);
-    }
+    setSelectedValues((prev) => {
+      const next = new Set(prev);
+      if (next.has(value)) {
+        next.delete(value);
+      } else {
+        next.add(value);
+      }
+      return next;
+    });
   };
 
   const handleSelectAll = () => {
-    const newValues = new Set([...selectedValues, ...filteredValues]);
-    onChange(Array.from(newValues));
+    setSelectedValues(new Set(values));
   };
 
   const handleSelectNone = () => {
-    onChange(selectedValues.filter((v) => !filteredValues.includes(v)));
+    setSelectedValues(new Set());
+  };
+
+  const handleApply = () => {
+    onApply(Array.from(selectedValues));
   };
 
   return (
-    <div className="w-56">
+    <div className="w-64">
       {/* Search */}
-      <div className="relative px-2 py-2 border-b">
-        <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-        <input
-          type="text"
-          placeholder={placeholder}
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="w-full pl-6 pr-2 py-1 text-sm border rounded bg-background focus:outline-none focus:ring-1 focus:ring-primary"
-        />
-      </div>
+      {searchable && (
+        <div className="p-2 border-b">
+          <div className="relative">
+            <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
+            <input
+              type="text"
+              placeholder="Search..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-7 pr-7 py-1 text-sm border rounded bg-background"
+            />
+            {searchTerm && (
+              <button
+                onClick={() => setSearchTerm("")}
+                className="absolute right-1 top-1/2 -translate-y-1/2 p-0.5 hover:bg-accent rounded"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            )}
+          </div>
+        </div>
+      )}
 
-      {/* Select All / None */}
-      <div className="flex items-center justify-between px-2 py-1.5 border-b text-xs">
+      {/* Select All/None */}
+      <div className="flex items-center justify-between px-2 py-1.5 border-b bg-muted/30 text-xs">
         <button
           onClick={handleSelectAll}
-          className={cn(
-            "hover:text-foreground",
-            allSelected ? "text-primary" : "text-muted-foreground"
-          )}
+          disabled={isAllSelected}
+          className="hover:text-primary disabled:opacity-50"
         >
           Select All
         </button>
-        <span className="text-muted-foreground">|</span>
+        <span className="text-muted-foreground">
+          {selectedValues.size} of {values.length}
+        </span>
         <button
           onClick={handleSelectNone}
-          className={cn(
-            "hover:text-foreground",
-            noneSelected ? "text-primary" : "text-muted-foreground"
-          )}
+          disabled={isNoneSelected}
+          className="hover:text-primary disabled:opacity-50"
         >
           Select None
         </button>
       </div>
 
       {/* Values List */}
-      <div className="max-h-48 overflow-auto py-1">
+      <div className="max-h-64 overflow-auto">
         {filteredValues.map((value, index) => {
-          const displayValue = value === null ? "(Blanks)" : value;
-          const isSelected = selectedValues.includes(value);
+          const isSelected = selectedValues.has(value);
+          const displayValue = value === null ? "(Blanks)" : String(value);
 
           return (
             <div
-              key={value ?? `null-${index}`}
-              className={cn(
-                "flex items-center gap-2 px-2 py-1.5 hover:bg-accent cursor-pointer",
-                isSelected && "bg-accent/50"
-              )}
+              key={`${value}-${index}`}
+              className="flex items-center gap-2 px-2 py-1.5 hover:bg-accent cursor-pointer"
               onClick={() => handleToggle(value)}
             >
-              <div
-                className={cn(
-                  "flex items-center justify-center w-4 h-4 border rounded",
-                  isSelected ? "bg-primary border-primary" : "border-muted-foreground"
-                )}
-              >
+              <div className={cn(
+                "flex items-center justify-center w-4 h-4 border rounded",
+                isSelected && "bg-primary border-primary"
+              )}>
                 {isSelected && <Check className="h-3 w-3 text-primary-foreground" />}
               </div>
-              <span className="text-sm truncate">{displayValue}</span>
+              <span className="flex-1 text-sm truncate">{displayValue}</span>
             </div>
           );
         })}
@@ -123,63 +137,24 @@ export function SetFilter({
         )}
       </div>
 
-      {/* Buttons */}
-      {showButtons && (
-        <div className="flex gap-1 px-2 py-2 border-t">
-          <button
-            onClick={onApply}
-            className="flex-1 px-2 py-1 text-xs bg-primary text-primary-foreground rounded hover:bg-primary/90"
-          >
-            Apply
-          </button>
-          <button
-            onClick={onClear}
-            className="px-2 py-1 text-xs border rounded hover:bg-accent"
-          >
-            <X className="h-3 w-3" />
-          </button>
-        </div>
-      )}
+      {/* Actions */}
+      <div className="flex gap-2 p-2 border-t">
+        <button
+          onClick={handleApply}
+          className="flex-1 px-2 py-1 text-sm bg-primary text-primary-foreground rounded hover:bg-primary/90"
+        >
+          Apply
+        </button>
+        <button
+          onClick={() => {
+            handleSelectNone();
+            onClear();
+          }}
+          className="px-2 py-1 text-sm border rounded hover:bg-accent"
+        >
+          Clear
+        </button>
+      </div>
     </div>
   );
 }
-
-/**
- * Extract unique values from data for a given field
- */
-export function extractUniqueValues<TData>(
-  data: TData[],
-  field: string,
-  valueFormatter?: (value: unknown) => string
-): (string | null)[] {
-  const values = new Set<string | null>();
-  
-  data.forEach((row) => {
-    const value = getNestedValue(row, field);
-    if (value === null || value === undefined || value === "") {
-      values.add(null);
-    } else {
-      const formatted = valueFormatter ? valueFormatter(value) : String(value);
-      values.add(formatted);
-    }
-  });
-
-  return Array.from(values).sort((a, b) => {
-    if (a === null) return 1;
-    if (b === null) return -1;
-    return a.localeCompare(b);
-  });
-}
-
-function getNestedValue(obj: unknown, path: string): unknown {
-  const parts = path.split(".");
-  let value = obj;
-  
-  for (const part of parts) {
-    if (value === null || value === undefined) return undefined;
-    value = (value as Record<string, unknown>)[part];
-  }
-  
-  return value;
-}
-

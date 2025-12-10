@@ -4,7 +4,7 @@ import * as React from "react";
 import { cn } from "@/lib/utils";
 import { TableHead, TableRow } from "@/components/ui/table";
 import { ChevronUp, ChevronDown, ChevronsUpDown, Check, Minus } from "lucide-react";
-import type { ColDef, SortModelItem, FilterModel, TextFilterModel, NumberFilterModel, RowNode } from "../types";
+import type { ColDef, SortModelItem, FilterModel, TextFilterModel, NumberFilterModel, SetFilterModel, RowNode } from "../types";
 import { getColId } from "../utils";
 import { ColumnMenu } from "./ColumnMenu";
 import { ResizeHandle } from "./ResizeHandle";
@@ -16,6 +16,7 @@ interface GridHeaderProps<TData> {
   headerHeight: number;
   multiSortKey: "ctrl" | "shift";
   showColumnMenu?: boolean;
+  columnFilterValues?: Record<string, (string | null)[]>; // Available values for set filters
   // Checkbox selection
   allRows?: RowNode<TData>[];
   selectedRowIds?: Set<string>;
@@ -27,7 +28,7 @@ interface GridHeaderProps<TData> {
   onSortDirect?: (colId: string, direction: "asc" | "desc" | null) => void;
   onHideColumn?: (colId: string) => void;
   onPinColumn?: (colId: string, pinned: "left" | "right" | null) => void;
-  onFilterChange?: (colId: string, filter: TextFilterModel | NumberFilterModel | null) => void;
+  onFilterChange?: (colId: string, filter: TextFilterModel | NumberFilterModel | SetFilterModel | null) => void;
   onColumnResize?: (colId: string, width: number) => void;
 }
 
@@ -38,6 +39,7 @@ export function GridHeader<TData>({
   headerHeight,
   multiSortKey,
   showColumnMenu = true,
+  columnFilterValues = {},
   allRows,
   selectedRowIds,
   filteredRowIds,
@@ -199,6 +201,7 @@ export function GridHeader<TData>({
                     colDef={colDef}
                     sortModel={sortModel}
                     filterModel={filterModel}
+                    availableValues={columnFilterValues[colId] || []}
                     onSort={handleSortDirect}
                     onHide={onHideColumn || (() => {})}
                     onPin={onPinColumn || (() => {})}

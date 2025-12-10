@@ -2,7 +2,7 @@
  * Grid utility functions
  */
 
-import type { RowNode, ColDef, TextFilterModel, NumberFilterModel } from "../types";
+import type { RowNode, ColDef, TextFilterModel, NumberFilterModel, SetFilterModel } from "../types";
 
 /**
  * Get value from row data using field path (supports nested paths like "user.name")
@@ -137,6 +137,20 @@ export function applyNumberFilter(value: unknown, filter: NumberFilterModel): bo
 }
 
 /**
+ * Apply set filter to a value
+ */
+export function applySetFilter(value: unknown, filter: SetFilterModel): boolean {
+  // Empty selection means show nothing (AG Grid behavior)
+  if (filter.values.length === 0) {
+    return false;
+  }
+  
+  // Check if value is in the selected set
+  const strValue = value === null || value === undefined ? null : String(value);
+  return filter.values.includes(strValue);
+}
+
+/**
  * Check if a filter model entry passes for a given value
  */
 export function passesFilter(value: unknown, filterEntry: unknown): boolean {
@@ -155,6 +169,9 @@ export function passesFilter(value: unknown, filterEntry: unknown): boolean {
   }
   if (filter.filterType === "number") {
     return applyNumberFilter(value, filter as NumberFilterModel);
+  }
+  if (filter.filterType === "set") {
+    return applySetFilter(value, filter as SetFilterModel);
   }
   
   // Default: simple contains filter

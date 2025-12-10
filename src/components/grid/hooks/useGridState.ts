@@ -13,6 +13,7 @@ import type {
   IDatasource,
   TextFilterModel,
   NumberFilterModel,
+  SetFilterModel,
 } from "../types";
 import { createRowNodes, getFieldValue, passesFilter, defaultComparator, getColId } from "../utils";
 
@@ -116,6 +117,30 @@ export function useGridState<TData>(options: GridStateOptions<TData>) {
 
   const hasFloatingFilters = mergedColumnDefs.some((col) => col.floatingFilter && col.filter);
   const visibleColumns = mergedColumnDefs.filter((col) => !col.hide);
+
+  // Compute unique values for set filters
+  const columnFilterValues = React.useMemo(() => {
+    const values: Record<string, (string | null)[]> = {};
+    
+    mergedColumnDefs.forEach((colDef) => {
+      const filterType = typeof colDef.filter === "string" ? colDef.filter : "";
+      if (filterType === "agSetColumnFilter" && colDef.field) {
+        const uniqueValues = new Set<string | null>();
+        (rowData ?? []).forEach((row) => {
+          const value = getFieldValue(row, colDef.field!.toString());
+          const strValue = value === null || value === undefined ? null : String(value);
+          uniqueValues.add(strValue);
+        });
+        values[getColId(colDef)] = Array.from(uniqueValues).sort((a, b) => {
+          if (a === null) return 1;
+          if (b === null) return -1;
+          return a.localeCompare(b);
+        });
+      }
+    });
+    
+    return values;
+  }, [rowData, mergedColumnDefs]);
 
   // ============================================================================
   // CLIENT-SIDE FILTERING
@@ -378,6 +403,7 @@ export function useGridState<TData>(options: GridStateOptions<TData>) {
     mergedColumnDefs,
     visibleColumns,
     hasFloatingFilters,
+    columnFilterValues,
     filteredRowData,
     rowNodes,
     paginatedRowNodes,

@@ -12,23 +12,26 @@ import {
   Filter,
   X,
 } from "lucide-react";
-import type { ColDef, SortModelItem, FilterModel, TextFilterModel, NumberFilterModel } from "../types";
+import type { ColDef, SortModelItem, FilterModel, TextFilterModel, NumberFilterModel, SetFilterModel } from "../types";
 import { getColId } from "../utils";
+import { SetFilter } from "./SetFilter";
 
 interface ColumnMenuProps<TData> {
   colDef: ColDef<TData>;
   sortModel: SortModelItem[];
   filterModel: FilterModel;
+  availableValues?: (string | null)[]; // For set filter
   onSort: (colId: string, direction: "asc" | "desc" | null) => void;
   onHide: (colId: string) => void;
   onPin: (colId: string, pinned: "left" | "right" | null) => void;
-  onFilterChange: (colId: string, filter: TextFilterModel | NumberFilterModel | null) => void;
+  onFilterChange: (colId: string, filter: TextFilterModel | NumberFilterModel | SetFilterModel | null) => void;
 }
 
 export function ColumnMenu<TData>({
   colDef,
   sortModel,
   filterModel,
+  availableValues = [],
   onSort,
   onHide,
   onPin,
@@ -43,7 +46,9 @@ export function ColumnMenu<TData>({
   const colId = getColId(colDef);
   const currentSort = sortModel.find((s) => s.colId === colId);
   const currentFilter = filterModel[colId];
-  const isNumberColumn = colDef.filter === "agNumberColumnFilter";
+  const filterTypeStr = typeof colDef.filter === "string" ? colDef.filter : "agTextColumnFilter";
+  const isNumberColumn = filterTypeStr === "agNumberColumnFilter";
+  const isSetColumn = filterTypeStr === "agSetColumnFilter";
 
   // Close on outside click
   React.useEffect(() => {
@@ -102,6 +107,18 @@ export function ColumnMenu<TData>({
     onFilterChange(colId, null);
   };
 
+  const handleSetFilterApply = (selectedValues: (string | null)[]) => {
+    if (selectedValues.length === 0) {
+      onFilterChange(colId, null);
+    } else {
+      onFilterChange(colId, {
+        filterType: "set",
+        values: selectedValues,
+      });
+    }
+    setIsOpen(false);
+  };
+
   const textFilterOptions = [
     { value: "contains", label: "Contains" },
     { value: "notContains", label: "Not contains" },
@@ -125,6 +142,11 @@ export function ColumnMenu<TData>({
   ];
 
   const filterOptions = isNumberColumn ? numberFilterOptions : textFilterOptions;
+  
+  // Get current selected values for set filter
+  const currentSetValues = currentFilter && typeof currentFilter === "object" && "values" in currentFilter
+    ? (currentFilter as SetFilterModel).values
+    : [];
 
   if (colDef.suppressMenu) {
     return null;
@@ -193,47 +215,62 @@ export function ColumnMenu<TData>({
                   <Filter className="h-3 w-3" />
                   Filter
                 </div>
-                <div className="px-2 pb-2 space-y-2">
-                  <select
-                    value={filterType}
-                    onChange={(e) => setFilterType(e.target.value)}
-                    className="w-full px-2 py-1 text-xs border rounded bg-background"
-                  >
-                    {filterOptions.map((opt) => (
-                      <option key={opt.value} value={opt.value}>
-                        {opt.label}
-                      </option>
-                    ))}
-                  </select>
-                  {filterType !== "blank" && filterType !== "notBlank" && (
-                    <input
-                      type={isNumberColumn ? "number" : "text"}
-                      value={filterValue}
-                      onChange={(e) => setFilterValue(e.target.value)}
-                      placeholder="Filter value..."
-                      className="w-full px-2 py-1 text-xs border rounded bg-background"
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") {
-                          handleApplyFilter();
-                        }
-                      }}
+                
+                {/* Set Filter (multi-select) */}
+                {isSetColumn ? (
+                  <div className="p-2">
+                    <SetFilter
+                      values={availableValues}
+                      selectedValues={currentSetValues}
+                      onApply={handleSetFilterApply}
+                      onClear={handleClearFilter}
+                      searchable
                     />
-                  )}
-                  <div className="flex gap-1">
-                    <button
-                      onClick={handleApplyFilter}
-                      className="flex-1 px-2 py-1 text-xs bg-primary text-primary-foreground rounded hover:bg-primary/90"
-                    >
-                      Apply
-                    </button>
-                    <button
-                      onClick={handleClearFilter}
-                      className="px-2 py-1 text-xs border rounded hover:bg-accent"
-                    >
-                      <X className="h-3 w-3" />
-                    </button>
                   </div>
-                </div>
+                ) : (
+                  /* Text/Number Filter */
+                  <div className="px-2 pb-2 space-y-2">
+                    <select
+                      value={filterType}
+                      onChange={(e) => setFilterType(e.target.value)}
+                      className="w-full px-2 py-1 text-xs border rounded bg-background"
+                    >
+                      {filterOptions.map((opt) => (
+                        <option key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </option>
+                      ))}
+                    </select>
+                    {filterType !== "blank" && filterType !== "notBlank" && (
+                      <input
+                        type={isNumberColumn ? "number" : "text"}
+                        value={filterValue}
+                        onChange={(e) => setFilterValue(e.target.value)}
+                        placeholder="Filter value..."
+                        className="w-full px-2 py-1 text-xs border rounded bg-background"
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            handleApplyFilter();
+                          }
+                        }}
+                      />
+                    )}
+                    <div className="flex gap-1">
+                      <button
+                        onClick={handleApplyFilter}
+                        className="flex-1 px-2 py-1 text-xs bg-primary text-primary-foreground rounded hover:bg-primary/90"
+                      >
+                        Apply
+                      </button>
+                      <button
+                        onClick={handleClearFilter}
+                        className="px-2 py-1 text-xs border rounded hover:bg-accent"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </div>
+                  </div>
+                )}
                 <div className="border-t my-1" />
               </>
             )}
@@ -297,4 +334,3 @@ export function ColumnMenu<TData>({
     </div>
   );
 }
-
