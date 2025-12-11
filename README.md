@@ -1,18 +1,23 @@
 # CursedGrid
 
-A high-performance, AG Grid-compatible data grid component library for React applications.
+A high-performance, **AG Grid Enterprise 32.3.1 compatible** data grid component library for React applications.
 
-> It's a grid. Don't ask questions.
+> A drop-in replacement for AG Grid Enterprise with ~75% feature parity. No license required.
 
-## Features
+## 🌟 Key Features
 
-- 🚀 **AG Grid Compatible API** - Familiar interface for easy migration
-- ⚛️ **React 19 Ready** - Built with the latest React features
-- 📝 **TypeScript First** - Full type safety out of the box
+- 🚀 **AG Grid Enterprise 32.3.1 API** - Drop-in replacement for most use cases
+- 📊 **Server-Side Row Model** - Enterprise-grade lazy loading with `IServerSideDatasource`
+- 🔍 **Advanced Filtering** - Text, Number, Set, Date filters with floating filters
+- ↕️ **Multi-Column Sorting** - Client and server-side sorting
+- ☑️ **Checkbox Selection** - Row selection with header checkbox
+- 📍 **Column Operations** - Resize, reorder, pin, hide columns
+- ⚛️ **React 19 Native** - Built for modern React
+- 📝 **TypeScript First** - Full type safety
 - 🎨 **Shadcn UI Styled** - Beautiful, accessible components
-- 📱 **Responsive** - Works on all screen sizes
 - 🌙 **Dark Mode** - Automatic dark mode support
-- 📖 **Storybook** - Interactive component documentation
+- 📖 **Storybook** - Interactive documentation
+- 💰 **No License Fees** - 100% open source
 
 ## Quick Start
 
@@ -103,12 +108,21 @@ cursed-grid/
 
 ## Documentation
 
-See the [doc/](./doc) folder for detailed documentation:
+### 📚 Comprehensive Guides
 
-- [Getting Started](./doc/getting-started.md)
-- [API Reference](./doc/api-reference.md)
-- [Column Definitions](./doc/column-definitions.md)
-- [Examples](./doc/examples.md)
+- **[FEATURES.md](./FEATURES.md)** - Complete feature list and quick start
+- **[AG Grid Compatibility](./doc/ag-grid-compatibility.md)** - Enterprise 32.3.1 compatibility matrix
+- [Getting Started](./doc/getting-started.md) - Installation and basic usage
+- [API Reference](./doc/api-reference.md) - Complete API documentation
+- [Column Definitions](./doc/column-definitions.md) - Column configuration guide
+- [Examples](./doc/examples.md) - Code examples
+
+### 🎯 For AG Grid Users
+
+If you're migrating from AG Grid Enterprise, start here:
+1. Read [ag-grid-compatibility.md](./doc/ag-grid-compatibility.md) for feature coverage
+2. Check [FEATURES.md](./FEATURES.md) for implementation status
+3. Review [API Reference](./doc/api-reference.md) for API differences
 
 ## Development with Codespaces
 
